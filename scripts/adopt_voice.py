@@ -3,7 +3,8 @@
 
     python3 -I adopt_voice.py <project_dir>                 # voice-in/NN.<ext> -> assets/voice/NN.wav + meta
     python3 -I adopt_voice.py <project_dir> --check         # every narrated frame has a voice, a WAV and words
-    python3 -I adopt_voice.py <project_dir> --check-script  # SCRIPT.md words == user_script.txt words, line by line
+    python3 -I adopt_voice.py <project_dir> --check-script  # SCRIPT.md words == user_script.txt words, line by line,
+                                                            # and both the script and storyboard open with the title intro
 
 Standard library only. ffmpeg, ffprobe and `npx hyperframes transcribe` are reached through
 three small functions that tests replace.
@@ -21,6 +22,9 @@ SCRIPT_HEADING = re.compile(r"^#{2,3}\s+.*?\(frame\s+(\d+)\)", re.I)
 SCRIPT_TEXT = re.compile(r"^(?: {4,}|\t)(.+)$")
 FRAME_RE = re.compile(r"^#{2,3}\s+(?:frame|beat|scene)\b.*?(\d+)", re.I)
 VOICEOVER_RE = re.compile(r"^\s*[-*]\s+(?:voiceover|vo|voice_over|narration)\s*:\s*(.+?)\s*$", re.I)
+INTRO_HEADING = re.compile(r"^#{2,3}\s+line\s+1\s+\W+\s*intro\s*\(frame\s+1\)", re.I | re.M)
+TITLE_RE = re.compile(r"^\s*[-*]\s+on_screen_title\s*:\s*(.+?)\s*$", re.I)
+MAX_INTRO_WORDS = 20
 
 
 def parse_script(md):
@@ -52,6 +56,20 @@ def narrated_frames(storyboard_md):
         if cur is not None and m and m.group(1).strip().strip("\"'").strip():
             frames[cur] = True
     return sorted(f for f, narrated in frames.items() if narrated)
+
+
+def intro_title(storyboard_md):
+    """STORYBOARD.md -> frame 1's `on_screen_title`, or "" when it has none."""
+    cur = None
+    for line in storyboard_md.splitlines():
+        h = FRAME_RE.match(line)
+        if h:
+            cur = int(h.group(1))
+            continue
+        m = TITLE_RE.match(line)
+        if cur == 1 and m and m.group(1).strip("\"'").strip():
+            return m.group(1).strip("\"'").strip()
+    return ""
 
 
 def words_of(text):
@@ -158,12 +176,18 @@ def check(p):
 
 
 def check_script(p):
-    scripts = {n: (p / n) for n in ("SCRIPT.md", "user_script.txt")}
+    scripts = {n: (p / n) for n in ("SCRIPT.md", "user_script.txt", "STORYBOARD.md")}
     absent = [n for n, f in scripts.items() if not f.exists()]
     if absent:
         return fail([f"{n} not found in {p}" for n in absent])
     actual, approved = (parse_script(scripts[n].read_text()) for n in ("SCRIPT.md", "user_script.txt"))
     problems = []
+    if not INTRO_HEADING.search(scripts["user_script.txt"].read_text()) or not approved or approved[0][0] != 1:
+        problems.append("user_script.txt must open with '## Line 1 — Intro (Frame 1)'")
+    elif not 0 < len(words_of(approved[0][1])) <= MAX_INTRO_WORDS:
+        problems.append(f"frame 1: the intro is one short sentence of at most {MAX_INTRO_WORDS} words")
+    if not intro_title(scripts["STORYBOARD.md"].read_text()):
+        problems.append("frame 1: STORYBOARD.md has no on_screen_title for the intro")
     if len(actual) != len(approved):
         problems.append(f"SCRIPT.md has {len(actual)} lines, user_script.txt has {len(approved)} lines")
     for (_, got), (frame, want) in zip(actual, approved):

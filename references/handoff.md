@@ -30,12 +30,13 @@ vo_mode: verbatim
 ## Intent
 
 <One short paragraph: what the video is, for whom, and the intent from the run answers.>
-Beat order: why it exists, what it changes, what comes next. The approved script is in
+Beat order: the intro (the title "<the digest's Title>" on screen and one sentence on what the
+video is about), then why it exists, what it changes, what comes next. The approved script is in
 `user_script.txt`; keep its wording.
 
 ## Notes
 
-- faceless-explainer deltas in force: skip the update question and continue offline at Step 0; this skill's voicing replaces Step 3.1; voice check after voicing, after fetch-sfx and after any re-voice; script lines one-to-one with frames; Step 6 rebuilds named frames only. Full text: <this skill's directory>/references/handoff.md.
+- faceless-explainer deltas in force: skip the update question and continue offline at Step 0; this skill's voicing replaces Step 3.1; voice check after voicing, after fetch-sfx and after any re-voice; script lines one-to-one with frames, Frame 1 the title intro; Step 6 rebuilds named frames only. Full text: <this skill's directory>/references/handoff.md.
 - music: none (the storyboard sets `music: none`; captions stay on).
 - Voice: <"Qwen3-TTS · <config qwen_speaker>" or "the user's own engine">, voiced by this skill.
 ```
@@ -51,13 +52,22 @@ Everything else in faceless-explainer runs as written, including Step 5's `sync-
 1. **Skip the "keep this skill fresh" update question**, because `init` already updated the skills. **At Step 0's sign-in status, relay it and continue offline**: this skill makes the narration and music is `none`, so no hosted provider is needed.
 2. **This skill's voicing replaces Step 3.1.** Never run faceless-explainer's `audio.mjs` voice generation. Do the voicing steps below at the same point: after the Step 3 plan approval, before Step 4.
 3. **Voice check** (below) after voicing, again after Step 5's `fetch-sfx`, and after any re-voice.
-4. **Script lines map one-to-one onto frames.** In Step 3, write one frame per line of `user_script.txt`, in the same order, with the same spoken words. Labels, `Time` and `Delivery` may change. After the Step 3 plan approval and before any voicing, run the script check:
+4. **Script lines map one-to-one onto frames, and Frame 1 is the title intro.** In Step 3, write one frame per line of `user_script.txt`, in the same order, with the same spoken words. Labels, `Time` and `Delivery` may change, except that Line 1 stays labeled `Intro`. Frame 1 is the intro scene:
+
+   ```markdown
+   ## Frame 1 — Intro
+   - on_screen_title: "<the digest's Title, word for word>"
+   - voiceover: "<Line 1's spoken text>"
+   ```
+
+   Its narrative asks for the title as the dominant on-screen text, nothing competing with it, and the intro line as the narration. This replaces faceless-explainer's opening-hook guidance for Frame 1; its hook strategy applies from Frame 2. After the Step 3 plan approval and before any voicing, run the script check:
 
    ```bash
    python3 -I <this skill's directory>/scripts/adopt_voice.py . --check-script
    ```
 
-   When it fails:
+   It also fails when `user_script.txt` does not open with `## Line 1 — Intro (Frame 1)`, when that line is longer than 20 words, or when `STORYBOARD.md` Frame 1 has no `on_screen_title`. When it fails:
+   - a missing or empty `on_screen_title` is fixed by writing the approved title into Frame 1, and the check runs again;
    - a wording change the user asked for at the Step 3 plan review is applied to `user_script.txt` first, gate 2 is re-approved and its new SHA-256 recorded in `RUN.md`, `SCRIPT.md` is updated to match, and the check runs again;
    - any other mismatch is fixed by rewriting `SCRIPT.md`'s spoken lines from `user_script.txt`, and the check runs again.
 5. **Step 6 change requests rebuild only the named frames**, one frame worker each. When a named frame's spoken text changed:

@@ -221,34 +221,75 @@ class CheckTests(Base):
         self.assertNotIn("frame 1", err)
 
 
+INTRO_SCRIPT = """## Line 1 — Intro (Frame 1)
+**Delivery:** warm
+    This is a short tour of the new upload flow.
+## Line 2 — Middle (Frame 2)
+    Shipped the thing.
+## Line 3 — End (Frame 3)
+    Next up is more.
+"""
+
+INTRO_STORYBOARD = """## Frame 1 — Intro
+- on_screen_title: "The New Upload Flow"
+- voiceover: "This is a short tour of the new upload flow."
+## Frame 2 — Middle
+## Frame 3 — End
+"""
+
+
 class CheckScriptTests(Base):
-    def test_passes_with_other_labels_rows_and_punctuation(self):
-        (self.p / "user_script.txt").write_text(
-            "## Line 0 (Frame 0)\n    hello, there TEAM!\n"
-            "## Line 1 (Frame 1)\n    Shipped -- the thing\n"
-            "## Line 2 (Frame 2)\n**Time:** 9s\n    next up is more\n")
-        code, err = self.run_main("--check-script")
+    def setUp(self):
+        super().setUp()
+        (self.p / "SCRIPT.md").write_text(INTRO_SCRIPT)
+        (self.p / "STORYBOARD.md").write_text(INTRO_STORYBOARD)
+
+    def check(self, user_script, storyboard=INTRO_STORYBOARD):
+        (self.p / "user_script.txt").write_text(user_script)
+        (self.p / "STORYBOARD.md").write_text(storyboard)
+        return self.run_main("--check-script")
+
+    def test_passes_with_other_rows_and_punctuation(self):
+        code, err = self.check(INTRO_SCRIPT.replace("Shipped the thing.", "Shipped -- THE thing!")
+                               .replace("## Line 3 — End (Frame 3)", "## Line 3 — End (Frame 3)\n**Time:** 9s"))
         self.assertEqual(code, 0, err)
 
     def test_one_word_differs(self):
-        (self.p / "user_script.txt").write_text(
-            "## Line 0 (Frame 0)\n    Hello there team.\n"
-            "## Line 1 (Frame 1)\n    Shipped the thing.\n"
-            "## Line 2 (Frame 2)\n    Next up is less.\n")
-        code, err = self.run_main("--check-script")
+        code, err = self.check(INTRO_SCRIPT.replace("is more", "is less"))
         self.assertNotEqual(code, 0)
-        self.assertIn("frame 2", err)
+        self.assertIn("frame 3", err)
         self.assertIn("less", err)
-        self.assertNotIn("frame 0", err)
+        self.assertNotIn("frame 1", err)
 
     def test_extra_line_in_script(self):
-        (self.p / "user_script.txt").write_text(
-            "## Line 0 (Frame 0)\n    Hello there team.\n"
-            "## Line 1 (Frame 1)\n    Shipped the thing.\n")
-        code, err = self.run_main("--check-script")
+        code, err = self.check(INTRO_SCRIPT.split("## Line 3")[0])
         self.assertNotEqual(code, 0)
         self.assertIn("3 lines", err)
         self.assertIn("2 lines", err)
+
+    def test_script_without_intro(self):
+        code, err = self.check(INTRO_SCRIPT.replace("Intro", "Hook"))
+        self.assertNotEqual(code, 0)
+        self.assertIn("Line 1 — Intro (Frame 1)", err)
+
+    def test_intro_longer_than_one_short_sentence(self):
+        long_intro = "This is a short tour of the new upload flow " + "and more " * 8
+        (self.p / "SCRIPT.md").write_text(INTRO_SCRIPT.replace("This is a short tour of the new upload flow.", long_intro))
+        code, err = self.check(INTRO_SCRIPT.replace("This is a short tour of the new upload flow.", long_intro))
+        self.assertNotEqual(code, 0)
+        self.assertIn("at most 20 words", err)
+
+    def test_storyboard_intro_without_title(self):
+        code, err = self.check(INTRO_SCRIPT, INTRO_STORYBOARD.replace('"The New Upload Flow"', '""'))
+        self.assertNotEqual(code, 0)
+        self.assertIn("on_screen_title", err)
+
+    def test_title_on_another_frame_does_not_count(self):
+        moved = INTRO_STORYBOARD.replace('- on_screen_title: "The New Upload Flow"\n', "") \
+            .replace("## Frame 2 — Middle", '## Frame 2 — Middle\n- on_screen_title: "X"')
+        code, err = self.check(INTRO_SCRIPT, moved)
+        self.assertNotEqual(code, 0)
+        self.assertIn("on_screen_title", err)
 
 
 if __name__ == "__main__":
