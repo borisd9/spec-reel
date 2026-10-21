@@ -23,13 +23,13 @@ Every run has its own folder with a `RUN.md` that records the stage and each app
 Clone it into your skills folder:
 
 ```bash
-git clone <repository-url> ~/.claude/skills/spec-reel
+git clone https://github.com/borisd9/spec-reel.git ~/.claude/skills/spec-reel
 ```
 
 Or clone it somewhere else and link it:
 
 ```bash
-git clone <repository-url> ~/skills/spec-reel
+git clone https://github.com/borisd9/spec-reel.git ~/skills/spec-reel
 ln -s ~/skills/spec-reel ~/.claude/skills/spec-reel
 ```
 
@@ -88,3 +88,7 @@ python3 -I -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
 The tests use fakes for ffmpeg, ffprobe, transcription and the Qwen3-TTS model, so they need none of them.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The Qwen3-TTS model it downloads is Apache-2.0.
