@@ -34,14 +34,18 @@ Beat order: the intro (the title "<the digest's Title>" on screen and one senten
 video is about), then why it exists, what it changes, what comes next. The approved script is in
 `user_script.txt`; keep its wording.
 
+## Assets
+
+- public/demo-01.mp4 — [video] <what it shows>; the Demo frame is built around it.
+
 ## Notes
 
-- faceless-explainer deltas in force: skip the update question and continue offline at Step 0; this skill's voicing replaces Step 3.1; voice check after voicing, after fetch-sfx and after any re-voice; script lines one-to-one with frames, Frame 1 the title intro; Step 6 rebuilds named frames only. Full text: <this skill's directory>/references/handoff.md.
+- faceless-explainer deltas in force: skip the update question and continue offline at Step 0; this skill's voicing replaces Step 3.1; voice check after voicing, after fetch-sfx and after any re-voice; script lines one-to-one with frames, Frame 1 the title intro, each demo file on its Demo frame; Step 6 rebuilds named frames only. Full text: <this skill's directory>/references/handoff.md.
 - music: none (the storyboard sets `music: none`; captions stay on).
 - Voice: <"Qwen3-TTS · <config qwen_speaker>" or "the user's own engine">, voiced by this skill.
 ```
 
-Replace `<this skill's directory>` with the real absolute path when writing the file. `storyboard: yes` with `flow: automation` is the collaborative mode: the user reviews the frame plan, the sketch board and the preview.
+Replace `<this skill's directory>` with the real absolute path when writing the file. `## Assets` lists each prepared `public/demo-NN` file (an image drops the `[video]` tag); leave the section out when the demo was skipped. `storyboard: yes` with `flow: automation` is the collaborative mode: the user reviews the frame plan, the sketch board and the preview.
 
 `user_script.txt` already sits at the project root, where faceless-explainer Step 1 saves a user script. `capture/extracted/visible-text.txt` (the approved digest) and `tokens.json` already exist; Step 1 checks they exist and does not rewrite them.
 
@@ -60,14 +64,17 @@ Everything else in faceless-explainer runs as written, including Step 5's `sync-
    - voiceover: "<Line 1's spoken text>"
    ```
 
-   Its narrative asks for the title as the dominant on-screen text, nothing competing with it, and the intro line as the narration. This replaces faceless-explainer's opening-hook guidance for Frame 1; its hook strategy applies from Frame 2. After the Step 3 plan approval and before any voicing, run the script check:
+   Its narrative asks for the title as the dominant on-screen text, nothing competing with it, and the intro line as the narration. This replaces faceless-explainer's opening-hook guidance for Frame 1; its hook strategy applies from Frame 2.
+
+   Each Demo line's frame names its demo file and builds around it, per `demo.md` § In the script and the scenes. This is faceless-explainer's user-supplied asset path (`public/<basename>` in `asset_candidates`), not a change to it. After the Step 3 plan approval and before any voicing, run the script check:
 
    ```bash
    python3 -I <this skill's directory>/scripts/adopt_voice.py . --check-script
    ```
 
-   It also fails when `user_script.txt` does not open with `## Line 1 — Intro (Frame 1)`, when that line is longer than 20 words, or when `STORYBOARD.md` Frame 1 has no `on_screen_title`. When it fails:
+   It also fails when `user_script.txt` does not open with `## Line 1 — Intro (Frame 1)`, when that line is longer than 20 words, when `STORYBOARD.md` Frame 1 has no `on_screen_title`, or when a `public/demo-*` file has no Demo line or no frame naming it. When it fails:
    - a missing or empty `on_screen_title` is fixed by writing the approved title into Frame 1, and the check runs again;
+   - a demo file with no frame naming it is fixed by adding its `asset_candidates` line to its Demo frame; a missing Demo line re-opens gate 2;
    - a wording change the user asked for at the Step 3 plan review is applied to `user_script.txt` first, gate 2 is re-approved and its new SHA-256 recorded in `RUN.md`, `SCRIPT.md` is updated to match, and the check runs again;
    - any other mismatch is fixed by rewriting `SCRIPT.md`'s spoken lines from `user_script.txt`, and the check runs again.
 5. **Step 6 change requests rebuild only the named frames**, one frame worker each. When a named frame's spoken text changed:

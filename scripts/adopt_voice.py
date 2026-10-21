@@ -4,7 +4,8 @@
     python3 -I adopt_voice.py <project_dir>                 # voice-in/NN.<ext> -> assets/voice/NN.wav + meta
     python3 -I adopt_voice.py <project_dir> --check         # every narrated frame has a voice, a WAV and words
     python3 -I adopt_voice.py <project_dir> --check-script  # SCRIPT.md words == user_script.txt words, line by line,
-                                                            # and both the script and storyboard open with the title intro
+                                                            # the script and storyboard open with the title intro,
+                                                            # and every public/demo-* file has its Demo line and frame
 
 Standard library only. ffmpeg, ffprobe and `npx hyperframes transcribe` are reached through
 three small functions that tests replace.
@@ -25,6 +26,8 @@ VOICEOVER_RE = re.compile(r"^\s*[-*]\s+(?:voiceover|vo|voice_over|narration)\s*:
 INTRO_HEADING = re.compile(r"^#{2,3}\s+line\s+1\s+\W+\s*intro\s*\(frame\s+1\)", re.I | re.M)
 TITLE_RE = re.compile(r"^\s*[-*]\s+on_screen_title\s*:\s*(.+?)\s*$", re.I)
 MAX_INTRO_WORDS = 20
+DEMO_HEADING = re.compile(r"^#{2,3}\s+line\s+\d+\s+\W+\s*demo\s*\(frame\s+\d+\)", re.I | re.M)
+ASSETS_RE = re.compile(r"^\s*[-*]\s+asset_candidates\s*:\s*(.+?)\s*$", re.I)
 
 
 def parse_script(md):
@@ -70,6 +73,16 @@ def intro_title(storyboard_md):
         if cur == 1 and m and m.group(1).strip("\"'").strip():
             return m.group(1).strip("\"'").strip()
     return ""
+
+
+def named_assets(storyboard_md):
+    """STORYBOARD.md -> basenames named in any frame's asset_candidates ("public/a.mp4 — desc; ...")."""
+    names = set()
+    for line in storyboard_md.splitlines():
+        m = ASSETS_RE.match(line)
+        if m:
+            names.update(Path(re.split(r"\s+[—–-]\s+", seg)[0].strip()).name for seg in m.group(1).split(";"))
+    return names
 
 
 def words_of(text):
@@ -186,8 +199,15 @@ def check_script(p):
         problems.append("user_script.txt must open with '## Line 1 — Intro (Frame 1)'")
     elif not 0 < len(words_of(approved[0][1])) <= MAX_INTRO_WORDS:
         problems.append(f"frame 1: the intro is one short sentence of at most {MAX_INTRO_WORDS} words")
-    if not intro_title(scripts["STORYBOARD.md"].read_text()):
+    storyboard = scripts["STORYBOARD.md"].read_text()
+    if not intro_title(storyboard):
         problems.append("frame 1: STORYBOARD.md has no on_screen_title for the intro")
+    demos = sorted(f.name for f in (p / "public").glob("demo-*"))
+    demo_lines = len(DEMO_HEADING.findall(scripts["user_script.txt"].read_text()))
+    if demo_lines < len(demos):
+        problems.append(f"user_script.txt has {demo_lines} Demo line(s) for {len(demos)} demo file(s)")
+    problems += [f"{d}: no STORYBOARD.md frame names public/{d} in asset_candidates"
+                 for d in demos if d not in named_assets(storyboard)]
     if len(actual) != len(approved):
         problems.append(f"SCRIPT.md has {len(actual)} lines, user_script.txt has {len(approved)} lines")
     for (_, got), (frame, want) in zip(actual, approved):

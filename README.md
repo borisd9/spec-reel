@@ -4,9 +4,9 @@ A Claude Code skill that turns links to plans and specs into a short narrated ex
 
 You give it one or more links or files. It reads them, writes a digest of why each plan exists, what it changes and what comes next, and writes a timestamped narration script. You approve both. It voices the script on your Mac with [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) through [MLX-Audio](https://github.com/Blaizzy/mlx-audio), or takes audio you make with any text-to-speech tool you choose. Then it hands scene building to the HyperFrames `faceless-explainer` workflow, which builds scenes synced to the narration and renders an MP4.
 
-Every video opens with an intro scene: the approved title on screen, narrated by one short sentence on what the video is about.
+Every video opens with an intro scene: the approved title on screen, narrated by one short sentence on what the video is about. When the feature can be shown, a demo scene shows it: a mock or a screen recording found in your sources or given by you. You can skip the demo.
 
-Stages: sources, digest and title (you approve), script (you approve), frame plan (you approve), sketches (you approve), preview (you approve), render.
+Stages: sources, digest, title and demo (you approve), script (you approve), frame plan (you approve), sketches (you approve), preview (you approve), render.
 
 Every run has its own folder with a `RUN.md` that records the stage and each approval, so an interrupted run can be resumed.
 

@@ -284,6 +284,25 @@ class CheckScriptTests(Base):
         self.assertNotEqual(code, 0)
         self.assertIn("on_screen_title", err)
 
+    def with_demo(self, script, storyboard):
+        (self.p / "public").mkdir()
+        (self.p / "public/demo-01.mp4").write_bytes(b"x")
+        (self.p / "SCRIPT.md").write_text(script)
+        return self.check(script, storyboard)
+
+    def test_demo_named_by_its_frame_passes(self):
+        script = INTRO_SCRIPT.replace("Middle (Frame 2)", "Demo (Frame 2)")
+        storyboard = INTRO_STORYBOARD.replace(
+            "## Frame 2 — Middle", "## Frame 2 — Demo\n- asset_candidates: public/demo-01.mp4 — [video] the upload")
+        code, err = self.with_demo(script, storyboard)
+        self.assertEqual(code, 0, err)
+
+    def test_demo_file_without_demo_line_or_frame(self):
+        code, err = self.with_demo(INTRO_SCRIPT, INTRO_STORYBOARD)
+        self.assertNotEqual(code, 0)
+        self.assertIn("0 Demo line(s) for 1 demo file(s)", err)
+        self.assertIn("demo-01.mp4: no STORYBOARD.md frame", err)
+
     def test_title_on_another_frame_does_not_count(self):
         moved = INTRO_STORYBOARD.replace('- on_screen_title: "The New Upload Flow"\n', "") \
             .replace("## Frame 2 — Middle", '## Frame 2 — Middle\n- on_screen_title: "X"')
