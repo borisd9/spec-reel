@@ -1,6 +1,6 @@
 ---
 name: spec-reel
-description: "Turn links to plans and specs into a short narrated explainer video. Asks for the sources, audience and length, reads them into an approved digest, writes an approved timestamped script, then has HyperFrames faceless-explainer build synced scenes and render an MP4, with narration from its voice engine or the user's own TTS. Use for requests like 'make a video explaining this plan', 'turn these specs into a narrated update video', 'short video of what this feature changes', 'explainer video from these docs for the team'. For a single document with no review gates or own-voice option, faceless-explainer alone is enough."
+description: "Turn links to plans and specs into a short narrated explainer video. Asks for the sources, audience and length, reads them into an approved digest, writes an approved timestamped script, voices it locally with Qwen3-TTS (or the user's own TTS), then has HyperFrames faceless-explainer build synced scenes and render an MP4. Use for requests like 'make a video explaining this plan', 'turn these specs into a narrated update video', 'short video of what this feature changes', 'explainer video from these docs for the team'. For a single document with no review gates or own-voice option, faceless-explainer alone is enough."
 argument-hint: links or paths to plans and specs
 ---
 
@@ -20,7 +20,7 @@ Config lives in `<this skill's directory>/config.json`, which is never committed
 
 1. When `config.json` is missing, copy `config.example.json` to `config.json`.
 2. When a value is empty where it is required (`output_root`, `style_preset`, `voice_source`), ask for all the missing ones in one batch, write them to `config.json`, and continue. Later runs ask nothing about setup.
-3. `voice` (empty means faceless-explainer's remembered or default voice) and `tts_command` (empty means the user drops audio files) may stay empty.
+3. `voice_source` is `qwen` (Qwen3-TTS on this Mac, the default) or `own` (the user's own engine). `qwen_speaker` defaults to `Aiden` (`Ryan` is the other English voice). `qwen_instruct` (empty means a calm, conversational narrator) and `tts_command` (empty means the user drops audio files) may stay empty.
 4. `tts_command` uses `{text_file}` and `{out}` placeholders (see `references/handoff.md`) and never contains a credential. When asked to save a command that contains a key-like literal (a token, key or password), refuse and ask for the form where the command reads the key from an environment variable or a file outside this folder.
 
 ## Start or resume
@@ -42,7 +42,7 @@ Run folders are never deleted.
 1. The links or files of the plans and specs to explain (one or more).
 2. The audience and the intent (what the viewer should know or do afterwards).
 3. The target length [60-90 seconds, a team update].
-4. The voice source: faceless-explainer's own engine [config `voice_source`, default], or the user's own TTS engine.
+4. The voice source: Qwen3-TTS on this Mac [config `voice_source`, default], or the user's own TTS engine.
 
 Then, from the folder that will contain the run folder:
 
@@ -53,7 +53,7 @@ npx hyperframes init "<folder>" --non-interactive --example=blank --skill=facele
 `init` refuses a non-empty folder, so write nothing into it before this command finishes. Then write `RUN.md`:
 
 ```markdown
-faceless-explainer deltas in force: skip the update question; own voice replaces Step 3.1; voice check after Step 3.1, after fetch-sfx and after any re-voice; script lines one-to-one with frames; Step 6 rebuilds named frames only. Full text: <this skill's directory>/references/handoff.md.
+faceless-explainer deltas in force: skip the update question and continue offline at Step 0; this skill's voicing replaces Step 3.1; voice check after voicing, after fetch-sfx and after any re-voice; script lines one-to-one with frames; Step 6 rebuilds named frames only. Full text: <this skill's directory>/references/handoff.md.
 
 # Run <folder name>
 
@@ -64,7 +64,7 @@ stage: sources            # sources | digest | script | faceless | done
 - audience: ...
 - intent: ...
 - length: ...
-- voice source: faceless | own   (own: whether a tts_command was used, never its text)
+- voice source: qwen (speaker) | own   (own: whether a tts_command was used, never its text)
 
 ## Sources
 - sources/01-<slug>.md  <original link>
@@ -103,7 +103,7 @@ Set `stage: script`.
 
 Write `user_script.txt` at the run folder root in the format of the installed HyperFrames `references/script-format.md`:
 
-- header line `**Voice:**` naming the config `voice`, "faceless-explainer default" when it is empty, or "your own engine" for the own source;
+- header line `**Voice:**` naming "Qwen3-TTS · <config qwen_speaker>", or "your own engine" for the own source;
 - one section per spoken line: `## Line N — <label> (Frame N)`, then `**Time:**`, then `**Delivery:**`, then the spoken text indented four spaces;
 - Line N and Frame N carry the same number, counting up one per line;
 - total length within the target length, at about 150 words per minute;
@@ -111,7 +111,7 @@ Write `user_script.txt` at the run folder root in the format of the installed Hy
 
 Show the script, its word count and estimated length, and one line on where the text goes:
 
-- faceless source: "This script text is sent to the voice provider faceless-explainer selects."
+- Qwen3-TTS: "This script is voiced on this Mac with Qwen3-TTS; the text does not leave the machine."
 - own source: "You voice this script with your own engine after the frame plan is approved."
 
 Wait for approval or edits; loop until approved. Record the approval time and SHA-256 in `RUN.md`. Nothing is voiced or built before this approval.
@@ -122,10 +122,10 @@ Set `stage: faceless`. Everything from here is in `references/handoff.md`; read 
 
 1. Write `BRIEF.md` from its template, with `vo_mode: verbatim` and the delta line in `## Notes`.
 2. Follow the installed faceless-explainer `SKILL.md` Steps 0 to 6 with the five deltas:
-   - Step 0 shows the sign-in status and waits as written; the update question is skipped.
+   - The update question is skipped; at Step 0 the sign-in status is relayed and the run continues offline, since this skill makes the narration.
    - Step 3 keeps `user_script.txt`'s lines one-to-one as frames; after the plan approval run the script check (`adopt_voice.py . --check-script`) before any voicing.
-   - Voice: faceless-explainer's Step 3.1, or the own-voice path (`adopt_voice.py .`) when the user's own engine was chosen. A run never mixes the two.
-   - Voice check (`adopt_voice.py . --check`) after Step 3.1, after Step 5's `fetch-sfx`, and after any re-voice. On failure stop and list the frames.
+   - Voice: this skill replaces Step 3.1. Qwen3-TTS (`scripts/qwen_voice.py` through `uv run`) or the user's own engine writes one file per line into `voice-in/`, then `adopt_voice.py .` adds word timings. A run never mixes the two.
+   - Voice check (`adopt_voice.py . --check`) after voicing, after Step 5's `fetch-sfx`, and after any re-voice. On failure stop and list the frames.
    - The user reviews the frame plan, the sketch board and the final preview before the render. Music is `none`.
    - A change request at the preview rebuilds only the named frames, plus any frame whose length changes.
 3. After the render, run the sync check, record it in `RUN.md`, set `stage: done`, and report the MP4 path, its length, the sync difference, and the frame ids.
