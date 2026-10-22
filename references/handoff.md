@@ -1,6 +1,6 @@
 # Handoff to faceless-explainer
 
-After gate 2 (the approved script), this skill writes `BRIEF.md` and then drives the installed faceless-explainer skill (its `SKILL.md`, Steps 0-6) with the five deltas below. Nothing in faceless-explainer is copied or patched here.
+After gate 2 (the approved script), this skill writes `BRIEF.md` and then drives the installed faceless-explainer skill (its `SKILL.md`, Steps 0-6) with the six deltas below. Nothing in faceless-explainer is copied or patched here.
 
 Do not invoke the `hyperframes` skill through the Skill tool; it may be disabled for model invocation. Read the installed faceless-explainer `SKILL.md` and the files it points to directly. faceless-explainer is installed in the user's Claude Code skills folder (`~/.claude/skills/faceless-explainer/SKILL.md`); its `<SKILL_DIR>` is that folder.
 
@@ -40,7 +40,7 @@ video is about), then why it exists, what it changes, what comes next. The appro
 
 ## Notes
 
-- faceless-explainer deltas in force: skip the update question and continue offline at Step 0; this skill's voicing replaces Step 3.1; voice check after voicing, after fetch-sfx and after any re-voice; script lines one-to-one with frames, Frame 1 the title intro, each demo file on its Demo frame; Step 6 rebuilds named frames only. Full text: <this skill's directory>/references/handoff.md.
+- faceless-explainer deltas in force: skip the update question and continue offline at Step 0; this skill's voicing replaces Step 3.1; voice check after voicing, after fetch-sfx and after any re-voice; script lines one-to-one with frames, Frame 1 the title intro, each demo file on its Demo frame; Step 6 rebuilds named frames only; claim check before the preview review. Full text: <this skill's directory>/references/handoff.md.
 - music: none (the storyboard sets `music: none`). captions: <config captions>.
 - Voice: <"Qwen3-TTS · <config qwen_speaker>" or "the user's own engine">, voiced by this skill.
 ```
@@ -49,7 +49,7 @@ Replace `<this skill's directory>` with the real absolute path when writing the 
 
 `user_script.txt` already sits at the project root, where faceless-explainer Step 1 saves a user script. `capture/extracted/visible-text.txt` (the approved digest) and `tokens.json` already exist; Step 1 checks they exist and does not rewrite them.
 
-## The five deltas
+## The six deltas
 
 Everything else in faceless-explainer runs as written, including Step 5's `sync-durations` and `fetch-sfx`.
 
@@ -85,6 +85,12 @@ Everything else in faceless-explainer runs as written, including Step 5's `sync-
    5. Run `sync-durations`, and `captions.mjs build` when config `captions` is `on`, then rebuild every frame whose duration changed.
 
    Every voice generation in a run, including re-voicing, goes through the run's chosen voice source. A run never mixes the two sources.
+6. **Claim check before the preview review.** faceless-explainer's checks look at structure, not at whether the words on screen are true, and its frame workers invent visuals. So after Step 6's checks pass and before the preview question, read every built frame (`compositions/frames/NN-*.html`) and list the text a viewer sees, including text that scripts type or reveal.
+   - **Must be grounded:** names, numbers, dates, statuses, capabilities and quotes. Each must appear in the approved digest (`capture/extracted/visible-text.txt`) or in `sources/`. Re-cased, shortened or split across elements is fine; invented is not.
+   - **Free to invent:** framing and connective text that asserts nothing, such as "Here's what changes" or "Next up".
+   - **Fix an ungrounded line** with the cheapest edit to that frame's HTML, using the digest's own wording, then run Step 6's checks again.
+
+   Record `claim check: <lines checked> lines, fixed <frame ids | none>` under `## Render` in `RUN.md`. Run it again after any Step 6 change request.
 
 ## Voicing (replaces Step 3.1)
 
@@ -157,9 +163,29 @@ Each worker's dispatch context lists that frame's word timings from `audio_meta.
    ```
 
    Record both numbers and their difference in `RUN.md`. A difference above 2 seconds is reported to the user before the run is marked `done`.
-2. Set `RUN.md` stage to `done`.
-3. Report: the MP4 path, its length, the sync difference, and the frame ids, so the user can ask for a single-scene change.
+2. Cover frame. Chat apps and most players show a video's first frame as its thumbnail, and a raw render starts on a fade. Make the first frame the intro title instead.
+   1. Pick a moment when the title is fully on screen: about 60% through Frame 1's voice (`duration_s` of frame 1 in `audio_meta.json`).
+   2. Pull that frame:
+
+      ```bash
+      ffmpeg -y -loglevel error -ss <seconds> -i renders/video.mp4 -frames:v 1 -q:v 2 renders/cover.jpg
+      ```
+
+   3. Look at `renders/cover.jpg`. When the title is still animating in or a transition shows, move the time by 0.3 seconds and pull it again.
+   4. Put it on frame 0 only. Every other frame, the length and the audio stay the same:
+
+      ```bash
+      ffmpeg -y -loglevel error -i renders/video.mp4 -i renders/cover.jpg \
+        -filter_complex "[0:v][1:v]overlay=0:0:enable='eq(n,0)'[v]" \
+        -map "[v]" -map "0:a?" -c:v libx264 -crf 18 -preset slow -pix_fmt yuv420p \
+        -c:a copy -movflags +faststart renders/video.cover.mp4 && mv renders/video.cover.mp4 renders/video.mp4
+      ```
+
+   5. Read the MP4 length again with `ffprobe`; it must match the length recorded in step 1. Record `cover: <seconds>` under `## Render` in `RUN.md`.
+3. Share caption. Write `renders/share-copy.txt`: one to three sentences to post with the video in a team channel, for the run's audience and intent. Every claim in it comes from the approved digest; it names no customer or person and carries no personal data, link to an internal page or credential. Plain words, no "excited to share".
+4. Set `RUN.md` stage to `done`.
+5. Report: the MP4 path, its length, the sync difference, the cover time, the caption text, and the frame ids, so the user can ask for a single-scene change or a caption edit.
 
 ## Step 6 change requests
 
-A change request at the preview rebuilds only the frames the user names, plus any frame whose length changes. Apply delta 5. Then run faceless-explainer's Step 6 checks again before the render.
+A change request at the preview rebuilds only the frames the user names, plus any frame whose length changes. Apply delta 5. Then run faceless-explainer's Step 6 checks and the claim check (delta 6) again before the render.
