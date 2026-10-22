@@ -10,6 +10,28 @@ Every video opens with an intro scene: the approved title on screen, narrated by
 
 Stages: sources, digest, title and demo (you approve), script (you approve), voicing, frame plan (you approve), sketches (you approve), claim check, preview (you approve), render, video check, cover frame and caption. With `--yolo`, the skill makes every approval itself (see [First run](#first-run)).
 
+```mermaid
+flowchart TD
+  sources[Read your links and files] --> digest[Digest, title and demo choice]
+  digest --> gate1{You approve?}
+  gate1 -- edits --> digest
+  gate1 -- yes --> script[Narration script]
+  script --> gate2{You approve?}
+  gate2 -- edits --> script
+  gate2 -- yes --> voice[Voice it on your Mac]
+  voice --> scenes[HyperFrames builds the scenes]
+  scenes --> claims[Claim check: on-screen facts vs sources]
+  claims --> preview{You approve the preview?}
+  preview -- changes --> scenes
+  preview -- yes --> render[Render the MP4]
+  render --> qc[Video check: loudness, format, length]
+  qc --> cover[Title as cover frame]
+  cover --> caption[Share caption]
+  caption --> report[Report]
+```
+
+With `--yolo`, every "You approve?" step is decided by the skill and listed in the report.
+
 Every run has its own folder with a `RUN.md` that records the stage and each approval, so an interrupted run can be resumed.
 
 ## Prerequisites
