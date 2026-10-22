@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
-"""Adopt the user's own narration files into a HyperFrames faceless-explainer project.
+"""Adopt narration files (Qwen3-TTS or the user's own engine) into a HyperFrames project.
 
     python3 -I adopt_voice.py <project_dir>                 # voice-in/NN.<ext> -> assets/voice/NN.wav + meta
+                                                            # (SCRIPT.md is first written from user_script.txt; a file
+                                                            # already transcribed is read from voice-cache/)
     python3 -I adopt_voice.py <project_dir> --pause 1.0     # same, with 1.0 s of silence after every line but the last
     python3 -I adopt_voice.py <project_dir> --check-speech  # lines whose transcript differs from SCRIPT.md (voice_heard.json)
     python3 -I adopt_voice.py <project_dir> --check         # every narrated frame has a voice, a WAV and words
-    python3 -I adopt_voice.py <project_dir> --check-script  # SCRIPT.md words == user_script.txt words, line by line,
-                                                            # the script and storyboard open with the title intro,
+    python3 -I adopt_voice.py <project_dir> --check-script  # SCRIPT.md is regenerated from user_script.txt; the script
+                                                            # and storyboard open with the title intro,
                                                             # and every public/demo-* file has its Demo line and frame,
-                                                            # and every other frame has a scene_job
+                                                            # and every other frame has a scene_job;
+                                                            # warns about words the voice may misread
 
 Standard library only. ffmpeg, ffprobe and `npx hyperframes transcribe` are reached through
 three small functions that tests replace.
 """
 import difflib
+import hashlib
 import json
 import math
 import re
@@ -24,7 +28,7 @@ from pathlib import Path
 
 EXTS = (".wav", ".mp3", ".m4a", ".aiff")
 WHISPER_MODEL = "medium.en"
-# Same rules as parseScript / runSyncDurations in faceless-explainer's scripts/audio.mjs.
+# Heading and spoken-text rules of the script files (the HyperFrames audio engine reads the same shape).
 SCRIPT_HEADING = re.compile(r"^#{2,3}\s+.*?\(frame\s+(\d+)\)", re.I)
 SCRIPT_TEXT = re.compile(r"^(?: {4,}|\t)(.+)$")
 FRAME_RE = re.compile(r"^#{2,3}\s+(?:frame|beat|scene)\b.*?(\d+)", re.I)
@@ -35,6 +39,9 @@ MAX_INTRO_WORDS = 20
 DEMO_HEADING = re.compile(r"^#{2,3}\s+line\s+\d+\s+\W+\s*demo\s*\(frame\s+\d+\)", re.I | re.M)
 ASSETS_RE = re.compile(r"^\s*[-*]\s+asset_candidates\s*:\s*(.+?)\s*$", re.I)
 SCENE_JOBS = ("why", "change", "proof", "next")
+# Respelled for the voice only (the written script and SCRIPT.md keep the written form). The config `pronunciations`
+# setting is merged over this by the caller.
+BUILTIN_RESPELLINGS = {"id": "I-D", "ids": "I-Ds", "PR": "P R", "v8": "V-eight"}
 CARD_RE = re.compile(r"^\s*[-*]\s+(scene_job|before|after)\s*:\s*(.+?)\s*$", re.I)
 
 
@@ -113,6 +120,89 @@ def words_of(text):
     return re.sub(r"[^\w\s]", " ", text.lower().replace("'", "")).split()
 
 
+def respell(text, pairs):
+    """Whole-word, case-sensitive WRITTEN -> SPOKEN replacements, for the text sent to the TTS engine only."""
+    for written, spoken in dict(pairs).items():
+        text = re.sub(r"(?<!\w)" + re.escape(written) + r"(?!\w)", lambda _: spoken, text)
+    return text
+
+
+def unrespell(text, pairs=BUILTIN_RESPELLINGS):
+    """The reverse: SPOKEN -> WRITTEN (case-insensitive; a hyphen also matches a space), for the checks."""
+    for written, spoken in dict(pairs).items():
+        pattern = re.escape(spoken).replace(r"\-", r"[-\s]?")
+        text = re.sub(r"(?<!\w)" + pattern + r"(?!\w)", lambda _: written, text, flags=re.I)
+    return text
+
+
+# --- one owner per fact and per script ------------------------------------------------------
+
+def load_facts(p):
+    """facts.json (flat {key: text}) or {}."""
+    f = Path(p) / "facts.json"
+    return json.loads(f.read_text()) if f.exists() else {}
+
+
+def fill_facts(text, facts):
+    """{{key}} -> facts[key]. ValueError names a key facts.json lacks."""
+    def one(m):
+        if m.group(1) not in facts:
+            raise ValueError(f"facts.json has no '{m.group(1)}' (named as {{{{{m.group(1)}}}}})")
+        return str(facts[m.group(1)])
+    return re.sub(r"\{\{(\w+)\}\}", one, text)
+
+
+def sync_script(p):
+    """SCRIPT.md is generated: user_script.txt with its {{facts}} filled. Nothing to do without user_script.txt."""
+    src = Path(p) / "user_script.txt"
+    if src.exists():
+        (Path(p) / "SCRIPT.md").write_text(fill_facts(src.read_text(), load_facts(p)))
+
+
+NUMBER_WORDS = "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen " \
+               "sixteen seventeen eighteen nineteen".split()
+TENS = "_ _ twenty thirty forty fifty sixty seventy eighty ninety".split()
+
+
+def number_words(n):
+    """45 -> "fortyfive", 318 -> "threehundredeighteen" (one run of letters, so spacing never matters)."""
+    if n < 20:
+        return NUMBER_WORDS[n]
+    if n < 100:
+        return TENS[n // 10] + (NUMBER_WORDS[n % 10] if n % 10 else "")
+    if n < 1000:
+        return NUMBER_WORDS[n // 100] + "hundred" + (number_words(n % 100) if n % 100 else "")
+    if n < 1_000_000:
+        return number_words(n // 1000) + "thousand" + (number_words(n % 1000) if n % 1000 else "")
+    return str(n)
+
+
+def canon(text, pairs=BUILTIN_RESPELLINGS):
+    """What a listener cannot tell apart: case, spaces, hyphens, digits vs number words, the respellings."""
+    text = unrespell(text, pairs).lower().replace("%", " percent")
+    text = re.sub(r"\ba (?=hundred|thousand|million)", "one ", text)
+    return re.sub(r"[^a-z]", "", re.sub(r"\d+", lambda m: number_words(int(m.group())), text))
+
+
+# Words Qwen3-TTS tends to misread: it spells a lowercase acronym out, reads an identifier as one blob, and trips
+# on digits stuck to letters.
+RISKY = (
+    (lambda t: "_" in t or ("-" in t and re.search(r"\d", t)), "an identifier; write it as plain words"),
+    (lambda t: re.search(r"[A-Za-z]\d|\d[A-Za-z]", t), "digits stuck to letters; add a respelling"),
+    (lambda t: t.isalpha() and t.islower() and len(t) <= 4 and not re.search(r"[aeiouy]", t),
+     "a lowercase acronym; write it in capitals or add a respelling"),
+)
+
+
+def risky_tokens(text, pairs=BUILTIN_RESPELLINGS):
+    """[(token, why)] for words in the spoken text that the voice may misread. Respelled words are not listed."""
+    out = []
+    for tok in respell(text, pairs).split():
+        tok = tok.strip(".,;:!?()\"'")
+        out += [(tok, why) for test, why in RISKY if tok and test(tok)][:1]
+    return out
+
+
 # --- the three replaceable external calls -------------------------------------------------
 
 def to_wav(src, dst, pad_s=0.0):
@@ -132,10 +222,23 @@ def transcribe(wav):
     wav = Path(wav).resolve()
     with tempfile.TemporaryDirectory(prefix="hf-trans-") as td:
         # wav sits at <project>/assets/voice/NN.wav
-        subprocess.run(["npx", "hyperframes", "transcribe", str(wav), "--model", WHISPER_MODEL, "--dir", td],
+        subprocess.run(["npx", "hyperframes", "transcribe", str(wav), "--engine", "whisper", "--model", WHISPER_MODEL, "--dir", td],
                        check=True, capture_output=True, text=True, cwd=wav.parents[2])
         arr = json.loads((Path(td) / "transcript.json").read_text())
     return [{"text": w.get("text", w.get("word", "")), "start": w["start"], "end": w["end"]} for w in arr]
+
+
+def cached_transcribe(p, wav, transcribe):
+    """transcribe(wav), remembered by the WAV's SHA-256 in voice-cache/<sha>.json: an unchanged file is never
+    transcribed twice. Returns (words, True when it came from the cache)."""
+    f = Path(p) / "voice-cache" / f"{hashlib.sha256(Path(wav).read_bytes()).hexdigest()}.json"
+    if f.exists():
+        return json.loads(f.read_text()), True
+    words = transcribe(wav)
+    if words:
+        f.parent.mkdir(exist_ok=True)
+        f.write_text(json.dumps(words))
+    return words, False
 
 
 # --- script words on transcript timings ---------------------------------------------------
@@ -172,17 +275,18 @@ def align_words(script_text, heard):
     return out
 
 
-def speech_diffs(script_text, heard):
-    """[(want, got)] where what was heard differs from the script. Digits vs number words are not a diff."""
+def speech_diffs(script_text, heard, pairs=BUILTIN_RESPELLINGS):
+    """[(want, got)] where what was heard differs from the script. Differences a listener cannot hear are not
+    diffs: case, spaces and hyphens inside a word ("PR412" for "PR 412"), digits for number words, respellings."""
     toks = script_text.split()
     diffs = []
     for tag, i1, i2, j1, j2 in _opcodes(script_text, heard):
         if tag == "equal":
             continue
-        want, got = toks[i1:i2], [h["text"].strip() for h in heard[j1:j2]]
-        if any(side and all(_norm(t).isdigit() for t in side) for side in (want, got)):
+        want, got = " ".join(toks[i1:i2]), " ".join(h["text"].strip() for h in heard[j1:j2])
+        if want and got and canon(want, pairs) == canon(got, pairs):
             continue
-        diffs.append((" ".join(want), " ".join(got)))
+        diffs.append((want, got))
     return diffs
 
 
@@ -198,6 +302,10 @@ def fail(lines):
 
 
 def adopt(p, to_wav, probe_duration, transcribe, pause_s=0.0):
+    try:
+        sync_script(p)
+    except ValueError as e:
+        return fail([str(e)])
     script = p / "SCRIPT.md"
     if not script.exists():
         return fail([f"SCRIPT.md not found in {p}"])
@@ -205,7 +313,7 @@ def adopt(p, to_wav, probe_duration, transcribe, pause_s=0.0):
     if not lines:
         return fail(["SCRIPT.md has no '(Frame N)' headings"])
     last_frame = max(f for f, _ in lines)
-    problems, voices, heard_by_frame = [], [], {}
+    problems, voices, heard_by_frame, cached = [], [], {}, 0
     (p / "assets/voice").mkdir(parents=True, exist_ok=True)
     for frame, text in lines:
         nn = f"{frame:02d}"
@@ -223,7 +331,8 @@ def adopt(p, to_wav, probe_duration, transcribe, pause_s=0.0):
         try:
             to_wav(found[0], dst, pad_s=pause_s if frame != last_frame else 0.0)
             duration = probe_duration(dst)
-            words = transcribe(dst)
+            words, hit = cached_transcribe(p, dst, transcribe)
+            cached += hit
         except Exception as e:  # ffmpeg, ffprobe or transcribe failed on this file
             problems.append(f"frame {frame}: unreadable ({found[0].name}): {e}")
             continue
@@ -246,7 +355,8 @@ def adopt(p, to_wav, probe_duration, transcribe, pause_s=0.0):
                            **{k: x for k, x in v.items() if k != "frame"}} for v in voices]
         f.write_text(json.dumps(meta, indent=2))
     (p / "voice_heard.json").write_text(json.dumps(heard_by_frame, indent=2))
-    print(f"adopted {len(voices)} voice file(s) -> audio_meta.json, audio_engine_meta.json")
+    print(f"adopted {len(voices)} voice file(s) ({len(voices) - cached} transcribed, {cached} from voice-cache/)"
+          " -> audio_meta.json, audio_engine_meta.json")
     diffs = [d for frame, text in lines for d in diff_lines(frame, text, heard_by_frame[str(frame)])]
     if diffs:
         print("\n".join(diffs))
@@ -274,37 +384,43 @@ def check(p):
 
 
 def check_script(p):
-    scripts = {n: (p / n) for n in ("SCRIPT.md", "user_script.txt", "STORYBOARD.md")}
-    absent = [n for n, f in scripts.items() if not f.exists()]
+    scripts = {n: (p / n) for n in ("user_script.txt", "STORYBOARD.md")}
+    # With no STORYBOARD.md yet (the frame plan comes after voicing starts) only the script's own rules are checked.
+    absent = [n for n, f in scripts.items() if not f.exists() and n != "STORYBOARD.md"]
     if absent:
         return fail([f"{n} not found in {p}" for n in absent])
-    actual, approved = (parse_script(scripts[n].read_text()) for n in ("SCRIPT.md", "user_script.txt"))
+    try:
+        approved_md = fill_facts(scripts["user_script.txt"].read_text(), load_facts(p))
+        sync_script(p)  # SCRIPT.md is generated, so it can never disagree with user_script.txt
+    except ValueError as e:
+        return fail([str(e)])
+    approved = parse_script(approved_md)
     problems = []
-    if not INTRO_HEADING.search(scripts["user_script.txt"].read_text()) or not approved or approved[0][0] != 1:
+    if not INTRO_HEADING.search(approved_md) or not approved or approved[0][0] != 1:
         problems.append("user_script.txt must open with '## Line 1 — Intro (Frame 1)'")
-    elif not 0 < len(words_of(approved[0][1])) <= MAX_INTRO_WORDS:
+    elif not 0 < len(unrespell(approved[0][1]).split()) <= MAX_INTRO_WORDS:
+        # the written words: "P R" counts as the one word "PR", a hyphenated word as one
         problems.append(f"frame 1: the intro is one short sentence of at most {MAX_INTRO_WORDS} words")
-    storyboard = scripts["STORYBOARD.md"].read_text()
-    if not intro_title(storyboard):
-        problems.append("frame 1: STORYBOARD.md has no on_screen_title for the intro")
+    storyboard = scripts["STORYBOARD.md"].read_text() if scripts["STORYBOARD.md"].exists() else None
     demos = sorted(f.name for f in (p / "public").glob("demo-*"))
-    demo_lines = len(DEMO_HEADING.findall(scripts["user_script.txt"].read_text()))
+    demo_lines = len(DEMO_HEADING.findall(approved_md))
     if demo_lines < len(demos):
         problems.append(f"user_script.txt has {demo_lines} Demo line(s) for {len(demos)} demo file(s)")
-    problems += [f"{d}: no STORYBOARD.md frame names public/{d} in asset_candidates"
-                 for d in demos if d not in named_assets(storyboard)]
-    for frame, card in sorted(scene_cards(storyboard).items()):
-        if frame == 1 or card.get("demo"):  # the intro and the Demo frames have no scene_job
-            continue
-        if card.get("scene_job") not in SCENE_JOBS:
-            problems.append(f"frame {frame}: STORYBOARD.md has no scene_job")
-        elif card["scene_job"] == "change" and not (card.get("before") and card.get("after")):
-            problems.append(f"frame {frame}: scene_job change needs before and after")
-    if len(actual) != len(approved):
-        problems.append(f"SCRIPT.md has {len(actual)} lines, user_script.txt has {len(approved)} lines")
-    for (_, got), (frame, want) in zip(actual, approved):
-        if words_of(got) != words_of(want):
-            problems.append(f"frame {frame}: approved {words_of(want)} but SCRIPT.md has {words_of(got)}")
+    if storyboard is not None:
+        if not intro_title(storyboard):
+            problems.append("frame 1: STORYBOARD.md has no on_screen_title for the intro")
+        problems += [f"{d}: no STORYBOARD.md frame names public/{d} in asset_candidates"
+                     for d in demos if d not in named_assets(storyboard)]
+        for frame, card in sorted(scene_cards(storyboard).items()):
+            if frame == 1 or card.get("demo"):  # the intro and the Demo frames have no scene_job
+                continue
+            if card.get("scene_job") not in SCENE_JOBS:
+                problems.append(f"frame {frame}: STORYBOARD.md has no scene_job")
+            elif card["scene_job"] == "change" and not (card.get("before") and card.get("after")):
+                problems.append(f"frame {frame}: scene_job change needs before and after")
+    for frame, text in approved:  # warnings only: they never fail the check
+        for tok, why in risky_tokens(text):
+            print(f'warning: frame {frame}: "{tok}" is {why}', file=sys.stderr)
     return fail(problems) if problems else 0
 
 

@@ -301,6 +301,132 @@ class AlignTests(unittest.TestCase):
         self.assertEqual(av.speech_diffs("forty-five of ten", self.heard("45", "of", "10")), [])
 
 
+class CacheTests(Base):
+    """A file is transcribed once: the transcript is remembered by the WAV's hash."""
+
+    def run_counting(self, *args):
+        calls = []
+
+        def counting(wav):
+            calls.append(Path(wav).name)
+            return fake_transcribe(wav)
+
+        with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+            code = av.main([str(self.p), *args], to_wav=fake_to_wav, probe_duration=fake_probe, transcribe=counting)
+        return code, calls
+
+    def test_second_run_transcribes_nothing(self):
+        self.three_files()
+        self.assertEqual(self.run_counting(), (0, ["00.wav", "01.wav", "02.wav"]))
+        self.assertEqual(self.run_counting(), (0, []))
+        self.assertEqual(len(list((self.p / "voice-cache").glob("*.json"))), 3)
+
+    def test_one_changed_file_transcribes_once(self):
+        self.three_files()
+        self.run_counting()
+        self.voice_in("01.wav", "shipped it")
+        self.assertEqual(self.run_counting(), (0, ["01.wav"]))
+        self.assertEqual([v["words"][-1]["text"] for v in self.meta()["voices"]][1], "thing.")
+
+    def test_a_new_pause_is_a_new_file(self):
+        self.three_files()
+        self.run_counting()
+        self.assertEqual(self.run_counting("--pause", "1.0"), (0, ["00.wav", "01.wav"]))
+
+    def test_no_words_is_not_cached(self):
+        self.voice_in("00.mp3", "")
+        self.voice_in("01.wav", "shipped the thing")
+        self.voice_in("02.m4a", "next up is more")
+        self.assertEqual(self.run_counting()[0], 1)
+        self.assertEqual(len(list((self.p / "voice-cache").glob("*.json"))), 2)
+
+    def test_adopt_says_how_many_came_from_the_cache(self):
+        self.three_files()
+        self.run_counting()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            av.main([str(self.p)], to_wav=fake_to_wav, probe_duration=fake_probe, transcribe=fake_transcribe)
+        self.assertIn("(0 transcribed, 3 from voice-cache/)", out.getvalue())
+
+
+class HeardTests(unittest.TestCase):
+    """Spelling-only differences are not speech errors; a different word is."""
+
+    @staticmethod
+    def heard(text):
+        return [{"text": t, "start": i * 0.5, "end": i * 0.5 + 0.4} for i, t in enumerate(text.split())]
+
+    def diffs(self, script, heard):
+        return av.speech_diffs(script, self.heard(heard))
+
+    def test_spelling_only_differences_pass(self):
+        for script, heard in (
+                ("The PR 412 build ships on v8 with ids", "The PR412, build ships on V8 with IDs"),
+                ("web V-eight index", "webv8 index"),
+                ("the same doc id.", "the same docid."),
+                ("Web search skips datahub", "WebSearch skips data hub"),
+                ("forty-five of ten", "45 of 10"),
+                ("sixty-nine percent of them", "69% of them"),
+                ("a hundred per search", "100 per search"),
+                ("two-second limit", "2 second limit"),
+                ("the I-D field", "the ID field")):
+            self.assertEqual(self.diffs(script, heard), [], script)
+
+    def test_a_different_word_is_still_a_difference(self):
+        self.assertEqual(self.diffs("Three readers returned zero drafts", "Three readers return 0 drafts"),
+                         [("returned zero", "return 0")])
+        self.assertEqual(self.diffs("PR 412 and ids", "PR412 and docs"), [("ids", "docs")])
+
+    def test_only_the_real_error_is_listed_among_noise(self):
+        script = "The PR 412 check ran on web V-eight, and three readers returned zero drafts, about sixty percent."
+        heard = "The PR412 check ran on webv8, and three readers return 0 drafts, about 60%."
+        self.assertEqual(self.diffs(script, heard), [("returned zero", "return 0")])
+
+    def test_unrespell_maps_the_spoken_form_back(self):
+        self.assertEqual(av.unrespell("the I-D of P R twelve on V-eight and I-Ds"), "the id of PR twelve on v8 and ids")
+
+    def test_respell_is_whole_word_and_case_sensitive(self):
+        self.assertEqual(av.respell("The id, ids, ID and idle PR on v8", av.BUILTIN_RESPELLINGS),
+                         "The I-D, I-Ds, ID and idle P R on V-eight")
+
+
+class ScriptSourceTests(Base):
+    """SCRIPT.md is generated from user_script.txt, with {{facts}} filled in."""
+
+    def setUp(self):
+        super().setUp()
+        self.three_files()
+        (self.p / "user_script.txt").write_text(SCRIPT.replace("Shipped the thing.", "Shipped ticket {{ticket}}."))
+        (self.p / "facts.json").write_text(json.dumps({"ticket": "412"}))
+
+    def test_adopt_writes_script_md_from_the_script_and_the_facts(self):
+        self.voice_in("01.wav", "shipped ticket 412")
+        self.assertEqual(self.run_main()[0], 0)
+        self.assertIn("Shipped ticket 412.", (self.p / "SCRIPT.md").read_text())
+        self.assertNotIn("{{", (self.p / "SCRIPT.md").read_text())
+
+    def test_a_fact_that_facts_json_lacks_is_named(self):
+        (self.p / "user_script.txt").write_text(SCRIPT.replace("Shipped the thing.", "Shipped {{branch}}."))
+        code, err = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("facts.json has no 'branch'", err)
+
+    def test_editing_only_the_script_is_enough(self):
+        self.run_main()
+        (self.p / "user_script.txt").write_text(SCRIPT.replace("Shipped the thing.", "Shipped ticket {{ticket}} today."))
+        self.run_main()
+        self.assertIn("today", (self.p / "SCRIPT.md").read_text())
+
+
+class RiskyTokenTests(unittest.TestCase):
+    def test_lists_what_the_voice_may_misread(self):
+        got = dict(av.risky_tokens("Fix kb_sync in x-12 for PR412, the dns and v8, then ids and the PR."))
+        self.assertEqual(sorted(got), ["PR412", "dns", "kb_sync", "x-12"])
+
+    def test_plain_words_are_not_listed(self):
+        self.assertEqual(av.risky_tokens("It is a pre-publish check: the sync, a rhythm and the Hub."), [])
+
+
 class CheckTests(Base):
     def project(self, storyboard=STORYBOARD, frames=(0, 2)):
         (self.p / "STORYBOARD.md").write_text(storyboard)
@@ -375,18 +501,10 @@ class CheckScriptTests(Base):
                                .replace("## Line 3 — End (Frame 3)", "## Line 3 — End (Frame 3)\n**Time:** 9s"))
         self.assertEqual(code, 0, err)
 
-    def test_one_word_differs(self):
+    def test_a_stale_script_md_is_regenerated_not_compared(self):
         code, err = self.check(INTRO_SCRIPT.replace("is more", "is less"))
-        self.assertNotEqual(code, 0)
-        self.assertIn("frame 3", err)
-        self.assertIn("less", err)
-        self.assertNotIn("frame 1", err)
-
-    def test_extra_line_in_script(self):
-        code, err = self.check(INTRO_SCRIPT.split("## Line 3")[0])
-        self.assertNotEqual(code, 0)
-        self.assertIn("3 lines", err)
-        self.assertIn("2 lines", err)
+        self.assertEqual(code, 0, err)
+        self.assertIn("Next up is less.", (self.p / "SCRIPT.md").read_text())
 
     def test_script_without_intro(self):
         code, err = self.check(INTRO_SCRIPT.replace("Intro", "Hook"))
@@ -399,6 +517,29 @@ class CheckScriptTests(Base):
         code, err = self.check(INTRO_SCRIPT.replace("This is a short tour of the new upload flow.", long_intro))
         self.assertNotEqual(code, 0)
         self.assertIn("at most 20 words", err)
+
+    def test_intro_counts_written_words_not_the_spoken_spelling(self):
+        short = "This is a short tour of the P R two-twelve upload flow with the new retry checks and the pre-publish docs."
+        self.assertGreater(len(av.words_of(short)), 20)  # the old count, which failed this intro
+        for intro, ok in ((short, True), (short + " Also this.", False)):
+            script = INTRO_SCRIPT.replace("This is a short tour of the new upload flow.", intro)
+            (self.p / "SCRIPT.md").write_text(script)
+            code, err = self.check(script)
+            self.assertEqual(code, 0 if ok else 1, err)
+            self.assertEqual("at most 20 words" in err, not ok)
+
+    def test_risky_words_warn_without_failing(self):
+        risky = INTRO_SCRIPT.replace("Shipped the thing.", "Shipped kb_sync on PR412.")
+        (self.p / "SCRIPT.md").write_text(risky)
+        code, err = self.check(risky)
+        self.assertEqual(code, 0, err)
+        self.assertIn('warning: frame 2: "kb_sync"', err)
+        self.assertIn('warning: frame 2: "PR412"', err)
+
+    def test_script_md_is_written_when_it_is_missing(self):
+        (self.p / "SCRIPT.md").unlink()
+        self.assertEqual(self.check(INTRO_SCRIPT)[0], 0)
+        self.assertTrue((self.p / "SCRIPT.md").exists())
 
     def test_storyboard_intro_without_title(self):
         code, err = self.check(INTRO_SCRIPT, INTRO_STORYBOARD.replace('"The New Upload Flow"', '""'))

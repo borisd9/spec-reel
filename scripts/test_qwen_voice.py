@@ -43,7 +43,7 @@ class Fake:
         return synthesize
 
 
-class QwenVoiceTests(unittest.TestCase):
+class Base(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.p = Path(self.tmp.name)
@@ -59,6 +59,8 @@ class QwenVoiceTests(unittest.TestCase):
             code = qwen_voice.main([str(self.p), *args], make_synthesizer=self.fake.make)
         return code, err.getvalue()
 
+
+class QwenVoiceTests(Base):
     def test_voices_every_line_with_one_model_load(self):
         code, _ = self.run_main()
         self.assertEqual(code, 0)
@@ -116,11 +118,98 @@ class QwenVoiceTests(unittest.TestCase):
             self.assertIn(f"--say needs WRITTEN=SPOKEN: {bad}", err)
         self.assertEqual(self.fake.loads, 0)
 
+    def test_builtin_respellings_always_apply_and_say_overrides_them(self):
+        (self.p / "SCRIPT.md").write_text(SCRIPT.replace("The middle line.", "The id of the PR on v8, and ids."))
+        self.assertEqual(self.run_main("--frames", "1")[0], 0)
+        self.assertEqual(self.fake.calls, ["The I-D of the P R on V-eight, and I-Ds."])
+        self.fake.calls.clear()
+        self.assertEqual(self.run_main("--frames", "1", "--say", "id=eye-dee")[0], 0)
+        self.assertEqual(self.fake.calls, ["The eye-dee of the P R on V-eight, and I-Ds."])
+
+    def test_script_md_is_generated_from_user_script_txt(self):
+        (self.p / "user_script.txt").write_text(SCRIPT.replace("Goodbye.", "Goodbye, ticket {{ticket}}."))
+        (self.p / "facts.json").write_text('{"ticket": "412"}')
+        self.assertEqual(self.run_main("--frames", "2")[0], 0)
+        self.assertEqual(self.fake.calls, ["Goodbye, ticket 412."])
+
     def test_missing_script(self):
         (self.p / "SCRIPT.md").unlink()
         code, err = self.run_main()
         self.assertEqual(code, 1)
         self.assertIn("SCRIPT.md not found", err)
+
+
+IDS_SCRIPT = "# SCRIPT\n\n" + "".join(
+    f"## Line {n} — L (Frame {n})\n\n    {text}\n\n" for n, text in enumerate(
+        ["Hello there."] * 3 + ["Each draft gets its own id: the published id."] + ["Plain."] * 2
+        + ["Sorted by doc id."] + ["Hidden by the fake, valid."] + ["An id filter."] + ["Plain."] * 4
+        + ["Five hundred hidden ids."] + ["Plain."] * 3, 1))
+
+
+class FramesWithAndTakesTests(Base):
+    def setUp(self):
+        super().setUp()
+        (self.p / "SCRIPT.md").write_text(IDS_SCRIPT)
+
+    def takes(self):
+        d = self.p / "voice-takes"
+        return sorted(d.iterdir()) if d.is_dir() else []
+
+    def test_frames_with_picks_the_frames_that_say_the_word_or_its_plural(self):
+        code, _ = self.run_main("--frames-with", "id")
+        self.assertEqual(code, 0)
+        self.assertEqual(sorted(f.name for f in (self.p / "voice-in").iterdir()), ["04.wav", "07.wav", "09.wav", "14.wav"])
+        self.assertEqual(len(self.fake.calls), 4)  # not "hidden", not "valid"
+
+    def test_frames_with_a_word_nobody_says_fails_before_loading_the_model(self):
+        code, err = self.run_main("--frames-with", "queue")
+        self.assertEqual(code, 1)
+        self.assertIn("no frame says 'queue'", err)
+        self.assertEqual(self.fake.loads, 0)
+
+    def test_a_file_is_backed_up_before_it_is_replaced(self):
+        (self.p / "voice-in").mkdir()
+        (self.p / "voice-in/04.wav").write_bytes(b"old take")
+        (self.p / "voice-in/05.wav").write_bytes(b"other frame")
+        self.assertEqual(self.run_main("--frames", "4")[0], 0)
+        (take,) = self.takes()
+        self.assertEqual((take / "04.wav").read_bytes(), b"old take")
+        self.assertFalse((take / "05.wav").exists())
+        self.assertNotEqual((self.p / "voice-in/04.wav").read_bytes(), b"old take")
+
+    def test_nothing_to_back_up_makes_no_take_folder(self):
+        self.assertEqual(self.run_main("--frames", "4")[0], 0)
+        self.assertEqual(self.takes(), [])
+
+    def test_restore_puts_a_take_back_and_keeps_the_file_it_replaces(self):
+        (self.p / "voice-takes/pre-fix").mkdir(parents=True)
+        (self.p / "voice-takes/pre-fix/04.wav").write_bytes(b"chosen take")
+        (self.p / "voice-takes/pre-fix/08.wav").write_bytes(b"another")
+        (self.p / "voice-takes/pre-fix/video.mp4").write_bytes(b"not audio")
+        (self.p / "voice-in").mkdir()
+        (self.p / "voice-in/04.mp3").write_bytes(b"newer take")
+        code, _ = self.run_main("--restore", "pre-fix", "--frames", "4")
+        self.assertEqual(code, 0)
+        self.assertEqual(sorted(f.name for f in (self.p / "voice-in").iterdir()), ["04.wav"])
+        self.assertEqual((self.p / "voice-in/04.wav").read_bytes(), b"chosen take")
+        saved = [t for t in self.takes() if t.name != "pre-fix"]
+        self.assertEqual([(t / "04.mp3").read_bytes() for t in saved], [b"newer take"])
+        self.assertEqual(self.fake.loads, 0)
+
+    def test_restore_without_frames_puts_back_every_audio_file(self):
+        (self.p / "voice-takes/t1").mkdir(parents=True)
+        for n in ("04", "08"):
+            (self.p / f"voice-takes/t1/{n}.wav").write_bytes(b"x")
+        self.assertEqual(self.run_main("--restore", "t1")[0], 0)
+        self.assertEqual(sorted(f.name for f in (self.p / "voice-in").iterdir()), ["04.wav", "08.wav"])
+
+    def test_restore_of_an_unknown_take_or_frame_fails(self):
+        code, err = self.run_main("--restore", "nope")
+        self.assertEqual((code, "voice-takes/nope not found" in err), (1, True))
+        (self.p / "voice-takes/t1").mkdir(parents=True)
+        (self.p / "voice-takes/t1/04.wav").write_bytes(b"x")
+        code, err = self.run_main("--restore", "t1", "--frames", "9")
+        self.assertEqual((code, "has no audio for 9" in err), (1, True))
 
 
 if __name__ == "__main__":
