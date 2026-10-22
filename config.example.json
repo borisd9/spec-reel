@@ -4,5 +4,8 @@
   "voice_source": "qwen",
   "qwen_speaker": "Aiden",
   "qwen_instruct": "",
-  "tts_command": ""
+  "tts_command": "",
+  "slide_pause_s": 1.0,
+  "captions": "off",
+  "pronunciations": {}
 }

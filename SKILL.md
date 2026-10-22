@@ -20,7 +20,7 @@ Config lives in `<this skill's directory>/config.json`, which is never committed
 
 1. When `config.json` is missing, copy `config.example.json` to `config.json`.
 2. When a value is empty where it is required (`output_root`, `style_preset`, `voice_source`), ask for all the missing ones in one batch, write them to `config.json`, and continue. Later runs ask nothing about setup.
-3. `voice_source` is `qwen` (Qwen3-TTS on this Mac, the default) or `own` (the user's own engine). `qwen_speaker` defaults to `Aiden` (`Ryan` is the other English voice). `qwen_instruct` (empty means a calm, conversational narrator) and `tts_command` (empty means the user drops audio files) may stay empty.
+3. `voice_source` is `qwen` (Qwen3-TTS on this Mac, the default) or `own` (the user's own engine). `qwen_speaker` defaults to `Aiden` (`Ryan` is the other English voice). `qwen_instruct` (empty means a calm, conversational narrator) and `tts_command` (empty means the user drops audio files) may stay empty. `slide_pause_s` (default `1.0`, seconds of silence after every line but the last), `captions` (`off` default, or `on`) and `pronunciations` (respellings for Qwen3-TTS, for example `{"KBs": "K-Bs"}`) may stay at their defaults.
 4. `tts_command` uses `{text_file}` and `{out}` placeholders (see `references/handoff.md`) and never contains a credential. When asked to save a command that contains a key-like literal (a token, key or password), refuse and ask for the form where the command reads the key from an environment variable or a file outside this folder.
 
 ## Start or resume
@@ -65,6 +65,7 @@ stage: sources            # sources | digest | script | faceless | done
 - intent: ...
 - length: ...
 - voice source: qwen (speaker) | own   (own: whether a tts_command was used, never its text)
+- pause: <slide_pause_s>s   captions: off | on
 
 ## Sources
 - sources/01-<slug>.md  <original link>
@@ -132,9 +133,9 @@ Set `stage: faceless`. Everything from here is in `references/handoff.md`; read 
 2. Follow the installed faceless-explainer `SKILL.md` Steps 0 to 6 with the five deltas:
    - The update question is skipped; at Step 0 the sign-in status is relayed and the run continues offline, since this skill makes the narration.
    - Step 3 keeps `user_script.txt`'s lines one-to-one as frames, and Frame 1 is the intro: the approved title on screen (`on_screen_title`) with the intro line as its voiceover. Each Demo frame names its `public/demo-NN` file in `asset_candidates` and uses it as the focal element. After the plan approval run the script check (`adopt_voice.py . --check-script`) before any voicing.
-   - Voice: this skill replaces Step 3.1. Qwen3-TTS (`scripts/qwen_voice.py` through `uv run`) or the user's own engine writes one file per line into `voice-in/`, then `adopt_voice.py .` adds word timings. A run never mixes the two.
+   - Voice: this skill replaces Step 3.1. Qwen3-TTS (`scripts/qwen_voice.py` through `uv run`) or the user's own engine writes one file per line into `voice-in/`, then `adopt_voice.py . --pause <slide_pause_s>` adds word timings and the pause. The speech check (`adopt_voice.py . --check-speech`) lists lines heard differently from the script, with up to two retakes. A run never mixes the two.
    - Voice check (`adopt_voice.py . --check`) after voicing, after Step 5's `fetch-sfx`, and after any re-voice. On failure stop and list the frames.
-   - The user reviews the frame plan, the sketch board and the final preview before the render. Music is `none`.
+   - The user reviews the frame plan, the sketch board and the final preview before the render. Music is `none`; captions follow the config `captions`.
    - A change request at the preview rebuilds only the named frames, plus any frame whose length changes.
 3. After the render, run the sync check, record it in `RUN.md`, set `stage: done`, and report the MP4 path, its length, the sync difference, and the frame ids.
 

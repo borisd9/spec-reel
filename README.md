@@ -53,6 +53,9 @@ cp config.example.json config.json
 | `qwen_speaker` | `Aiden` (default) or `Ryan`, the two English voices. |
 | `qwen_instruct` | A style instruction for Qwen3-TTS. Empty means a calm, conversational narrator. |
 | `tts_command` | Default command for your own engine. Empty means you drop audio files. |
+| `slide_pause_s` | Seconds of silence after every line but the last. Default `1.0`. |
+| `captions` | `off` (default) or `on`. |
+| `pronunciations` | Respellings for Qwen3-TTS, for example `{"KBs": "K-Bs"}`. Default `{}`. |
 
 ## Voice sources
 
@@ -71,7 +74,7 @@ say -v Samantha -f {text_file} -o {out}.aiff
 
 The spoken text reaches the command only through `{text_file}`. A command never contains a credential: if your tool needs a key, the command reads it from an environment variable or a file outside this folder. The skill refuses to save a command that contains a key.
 
-`scripts/adopt_voice.py` then converts the files to WAV, gets word timings with `npx hyperframes transcribe`, and writes the audio metadata faceless-explainer reads. Changing one line means replacing one file and running it again.
+`scripts/adopt_voice.py` then converts the files to WAV, gets word timings with `npx hyperframes transcribe`, and writes the audio metadata faceless-explainer reads. It keeps the script's own words on the transcript timings and reports lines that were heard differently (`--check-speech`). Changing one line means replacing one file and running it again.
 
 ## First run
 
