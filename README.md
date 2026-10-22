@@ -1,12 +1,14 @@
 # Spec Reel
 
+<img width="1024" height="572" alt="Spec Reel logo" src="https://github.com/user-attachments/assets/586ad0a4-15ee-4b85-a283-3bf0f9c668e2" />
+
 A Claude Code skill that turns links to plans and specs into a short narrated explainer video.
 
 You give it one or more links or files. It reads them, writes a digest of why each plan exists, what it changes and what comes next, and writes a timestamped narration script. You approve both. It voices the script on your Mac with [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) through [MLX-Audio](https://github.com/Blaizzy/mlx-audio), or takes audio you make with any text-to-speech tool you choose. Then it hands scene building to the HyperFrames `faceless-explainer` workflow, which builds scenes synced to the narration and renders an MP4.
 
 Every video opens with an intro scene: the approved title on screen, narrated by one short sentence on what the video is about. When the feature can be shown, a demo scene shows it: a mock or a screen recording found in your sources or given by you. You can skip the demo.
 
-Stages: sources, digest, title and demo (you approve), script (you approve), frame plan (you approve), sketches (you approve), preview (you approve), render.
+Stages: sources, digest, title and demo (you approve), script (you approve), voicing, frame plan (you approve), sketches (you approve), claim check, preview (you approve), render, cover frame and caption. With `--yolo`, the skill makes every approval itself (see [First run](#first-run)).
 
 Every run has its own folder with a `RUN.md` that records the stage and each approval, so an interrupted run can be resumed.
 
@@ -15,7 +17,7 @@ Every run has its own folder with a `RUN.md` that records the stage and each app
 - Claude Code
 - The HyperFrames skills, including `faceless-explainer`: `npx hyperframes skills`
 - Node.js with `npx`
-- Python 3
+- Python 3.10 or later
 - `ffmpeg` and `ffprobe` on your path
 - For the default voice: an Apple Silicon Mac and [`uv`](https://docs.astral.sh/uv/). The skill runs Qwen3-TTS with `uv run --with mlx-audio`, so there is nothing else to install; the model (about 4 GB) downloads on first use. On other machines, use your own engine.
 - Optional: the GitHub CLI (`gh`), signed in, to read GitHub links
@@ -36,6 +38,8 @@ ln -s ~/skills/spec-reel ~/.claude/skills/spec-reel
 ```
 
 Start a new Claude Code session. `spec-reel` appears in the skill list.
+
+To update later, pull in the folder you cloned: `git -C ~/.claude/skills/spec-reel pull` (or `~/skills/spec-reel` for a linked clone).
 
 ## Configure
 
@@ -59,7 +63,7 @@ cp config.example.json config.json
 
 ## Voice sources
 
-**Qwen3-TTS** (default). Runs locally through MLX-Audio, so the script text never leaves your machine. Model: `mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16` (Apache-2.0). On an Apple Silicon Mac it generates speech about twice as fast as real time. To voice a script by hand:
+**Qwen3-TTS** (default). Runs locally through MLX-Audio, so the script text never leaves your machine. Model: `mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16` (Apache-2.0). On an Apple Silicon Mac it generates speech faster than real time: about a minute for 90 seconds of narration, after the first model load. To voice a script by hand:
 
 ```bash
 uv run --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
