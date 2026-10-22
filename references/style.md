@@ -25,6 +25,10 @@ Each one has a short bad and good version.
   - Bad: "So what changes? Retries."
   - Good: "Retries are now automatic."
 
+## For the scenes
+
+- **Name what you explain.** A concept named on a `next` frame (a job, a check, a flag, a component) gets one sentence on what it will do, or it is not named. "Next comes the slow check job" tells the viewer nothing; "Next, a slow check will run every eval on drafts" does. The claim check flags a named concept with no explanation.
+
 ## For the voice
 
 - A sentence has at most 25 words. Long sentences hurt Qwen3-TTS pacing and are hard to follow by ear.

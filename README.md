@@ -4,7 +4,7 @@
 
 A Claude Code skill that turns links to plans and specs into a short narrated explainer video.
 
-You give it one or more links or files. It reads them, writes a digest of why each plan exists, what it changes and what comes next, and writes a timestamped narration script. You approve both. It voices the script on your Mac with [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) through [MLX-Audio](https://github.com/Blaizzy/mlx-audio), or takes audio you make with any text-to-speech tool you choose. Then it hands scene building to the HyperFrames `faceless-explainer` workflow, which builds scenes synced to the narration and renders an MP4.
+You give it one or more links or files. It reads them, writes a digest of why each plan exists, what it changes and what comes next, and writes a timestamped narration script. You approve both. It voices the script on your Mac with [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) through [MLX-Audio](https://github.com/Blaizzy/mlx-audio), or takes audio you make with any text-to-speech tool you choose. Then it builds one scene per script line with the HyperFrames explainer route, each cued on the words of its narration, and renders an MP4.
 
 Every video opens with an intro scene: the approved title on screen, narrated by one short sentence on what the video is about. When the feature can be shown, a demo scene shows it: a mock or a screen recording found in your sources or given by you. You can skip the demo.
 
@@ -13,14 +13,13 @@ How a run goes:
 1. Read your links and files.
 2. Write a digest, a title and a demo choice. You approve or edit.
 3. Write the narration script. You approve or edit.
-4. HyperFrames plans the scenes. You review the frame plan.
-5. Voice the script on your Mac.
-6. HyperFrames sketches and builds the scenes. You review the sketches.
-7. Check that every fact on screen comes from your sources.
-8. Show the preview. You approve or ask for changes.
-9. Render the MP4, then check its loudness, format and length.
-10. Put the title on the first frame as the cover, and write a share caption.
-11. Report what was made.
+4. Voice the script on your Mac, in the background, while the frame plan is written. You review the frame plan.
+5. Build one scene per line, cued on the words of the narration.
+6. Check that every fact on screen comes from your sources.
+7. Look at stills of the scenes (`finish.py --review`, seconds, no render). You approve or ask for changes; a change rebuilds only the scenes you name.
+8. Render the MP4 once (`finish.py --final`), normalize its loudness and check its format and length.
+9. Put the title on the first frame as the cover, and write a share caption.
+10. Report what was made.
 
 With `--yolo`, the skill makes every approval itself and lists those decisions in the report (see [First run](#first-run)).
 
@@ -29,7 +28,7 @@ Every run has its own folder with a `RUN.md` that records the stage and each app
 ## Prerequisites
 
 - Claude Code
-- The HyperFrames skills, including `faceless-explainer`: `npx hyperframes skills`
+- The HyperFrames skills (the skill's explainer route): `npx hyperframes skills`
 - Node.js with `npx`
 - Python 3.10 or later
 - `ffmpeg` and `ffprobe` on your path
@@ -66,14 +65,14 @@ cp config.example.json config.json
 | Field | Meaning |
 |---|---|
 | `output_root` | Where run folders go. Default `~/Movies/hyperframes`. |
-| `style_preset` | The faceless-explainer look. Default `blue-professional`. |
+| `style_preset` | The look of the scenes. Default `blue-professional`, the one the bundled scene template implements; for another, restyle a copy of `assets/index.template.html` as `build/index.template.html` in the run. |
 | `voice_source` | `qwen` (Qwen3-TTS on your Mac, default) or `own` (your own engine). |
 | `qwen_speaker` | `Aiden` (default) or `Ryan`, the two English voices. |
 | `qwen_instruct` | A style instruction for Qwen3-TTS. Empty means a calm, conversational narrator. |
 | `tts_command` | Default command for your own engine. Empty means you drop audio files. |
 | `slide_pause_s` | Seconds of silence after every line but the last. Default `1.0`. |
 | `captions` | `off` (default) or `on`. |
-| `pronunciations` | Respellings for Qwen3-TTS, for example `{"KBs": "K-Bs"}`. Default `{}`. |
+| `pronunciations` | Respellings for Qwen3-TTS, added to the built-in ones (`id`, `ids`, `PR`, `v8`), for example `{"KBs": "K-Bs"}`. Default `{}`. |
 
 ## Voice sources
 
@@ -92,7 +91,7 @@ say -v Samantha -f {text_file} -o {out}.aiff
 
 The spoken text reaches the command only through `{text_file}`. A command never contains a credential: if your tool needs a key, the command reads it from an environment variable or a file outside this folder. The skill refuses to save a command that contains a key.
 
-`scripts/adopt_voice.py` then converts the files to WAV, gets word timings with `npx hyperframes transcribe`, and writes the audio metadata faceless-explainer reads. It keeps the script's own words on the transcript timings and reports lines that were heard differently (`--check-speech`). Changing one line means replacing one file and running it again.
+`scripts/adopt_voice.py` then converts the files to WAV, gets word timings with `npx hyperframes transcribe`, and writes the audio metadata the build reads. It keeps the script's own words on the transcript timings and reports lines that were heard differently (`--check-speech`; spelling-only differences are not reported). A transcript is remembered by the audio's hash, so changing one line means replacing one file and running it again: only that file is transcribed. To re-voice by word, `qwen_voice.py --frames-with id`; every voicing first copies the files it replaces into `voice-takes/`, and `--restore` puts a take back.
 
 ## First run
 
@@ -110,9 +109,9 @@ For a run with no questions at all, add `--yolo`:
 
 It uses the defaults (a team update, about 75 seconds, the configured voice), decides every review itself, renders the MP4, and ends with a list of everything it decided without you. It never posts or shares the video. Claude Code may still ask permission to run commands (`npx`, `ffmpeg`, `uv`, `curl`, `gh`) unless your permission mode allows them.
 
-Without `--yolo`, the skill asks, in one batch: the links or files, the audience and intent, the target length (default 60-90 seconds) and the voice source. Then approve the digest, approve the script, and review the frame plan, the sketch board and the preview. Before the preview, the skill checks that every name, number and capability shown on screen comes from your sources.
+Without `--yolo`, the skill asks, in one batch: the links or files, the audience and intent, the target length (default 60-90 seconds) and the voice source. Then approve the digest, approve the script, review the frame plan, and approve the stills before the render. Before the stills, the skill checks that every name, number and capability shown on screen comes from your sources.
 
-After the render, `scripts/qc_video.py` normalizes the loudness to -16 LUFS and checks the MP4's format, audio, black spans and length.
+`scripts/finish.py <run> --review` and `--final` are the two commands that follow any change: adopt the voice, build `index.html`, check the scenes, and (for `--final`) render, normalize the loudness to -16 LUFS with `scripts/qc_video.py`, check the MP4's format, audio, black spans and length, and add the cover. `--review` looks only at the scenes that changed since its last run. Scenes use no CSS filters, so the renderer stays in fast capture.
 
 Inside the run folder, `renders/` then holds:
 
@@ -126,7 +125,7 @@ Inside the run folder, `renders/` then holds:
 python3 -I -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
-The tests use fakes for ffmpeg, ffprobe, transcription and the Qwen3-TTS model, so they need none of them. `scripts/test_skill_structure.py` also checks that the documents agree: every named file and link exists, the delta line and delta count match across `SKILL.md` and `references/handoff.md`, and `config.example.json` matches the table above.
+The tests use fakes for ffmpeg, ffprobe, transcription and the Qwen3-TTS model, so they need none of them. `scripts/test_skill_structure.py` also checks that the documents agree: every named file and link exists (scripts, references, assets), no document names a retired skill, and `config.example.json` matches the table above.
 
 Every pull request runs `.github/workflows/checks.yml`: these tests on Linux and macOS, `ruff`, a gitleaks secret scan, and a scan for names the repository keeps private (its word list is a repository secret, so pull requests from forks skip it).
 
