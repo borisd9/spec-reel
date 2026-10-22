@@ -51,6 +51,13 @@ class QcTests(unittest.TestCase):
         self.assertEqual(self.run_main("--check", "75", info={**GOOD, "duration": 75 * 1.12 + 0.1})[0], 1)
         self.assertEqual(self.run_main("--check", "75", info={**GOOD, "duration": 75 * 0.88 - 0.1})[0], 1)
 
+    def test_target_range(self):
+        for duration, code in ((88.0, 0), (60 * 0.88 - 0.1, 1), (90 * 1.12 + 0.1, 1)):
+            self.assertEqual(self.run_main("--check", "60-90", info={**GOOD, "duration": duration})[0], code, duration)
+        self.assertIn("outside 60-90s", self.run_main("--check", "60-90", info={**GOOD, "duration": 120.0})[2])
+        for bad in ("90-60", "60-", "-60", "60-90-120"):
+            self.assertIn("usage: qc_video.py", self.run_main("--check", bad)[2], bad)
+
     def test_blackdetect_output_is_parsed(self):
         out = "[blackdetect @ 0x1] black_start:1.5 black_end:2.75 black_duration:1.25\nother line\n"
         self.assertEqual([(float(a), float(b)) for a, b in qc.BLACK_RE.findall(out)], [(1.5, 2.75)])

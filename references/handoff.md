@@ -55,7 +55,7 @@ Replace `<this skill's directory>` with the real absolute path when writing the 
 Everything else in faceless-explainer runs as written, including Step 5's `sync-durations` and `fetch-sfx`.
 
 1. **Skip the "keep this skill fresh" update question**, because `init` already updated the skills. **At Step 0's sign-in status, relay it and continue offline**: this skill makes the narration and music is `none`, so no hosted provider is needed.
-2. **This skill's voicing replaces Step 3.1.** Never run faceless-explainer's `audio.mjs` voice generation. Do the voicing steps below at the same point: after the Step 3 plan approval, before Step 4.
+2. **This skill's voicing replaces Step 3.1.** Never run faceless-explainer's `audio.mjs` voice generation. Do the voicing steps below at the same point: after the Step 3 plan approval (in yolo mode, once the plan is written), before Step 4.
 3. **Voice check** (below) after voicing, again after Step 5's `fetch-sfx`, and after any re-voice.
 4. **Script lines map one-to-one onto frames, and Frame 1 is the title intro.** In Step 3, write one frame per line of `user_script.txt`, in the same order, with the same spoken words. Labels, `Time` and `Delivery` may change, except that Line 1 stays labeled `Intro`. Frame 1 is the intro scene:
 
@@ -81,7 +81,7 @@ Everything else in faceless-explainer runs as written, including Step 5's `sync-
 
    The screen and the voice do two jobs. The screen shows the noun or the number; the voice carries the sentence. They never show the same sentence.
 
-   Each Demo line's frame names its demo file and builds around it, per `demo.md` § In the script and the scenes. This is faceless-explainer's user-supplied asset path (`public/<basename>` in `asset_candidates`), not a change to it. After the Step 3 plan approval and before any voicing, run the script check:
+   Each Demo line's frame names its demo file and builds around it, per `demo.md` § In the script and the scenes. This is faceless-explainer's user-supplied asset path (`public/<basename>` in `asset_candidates`), not a change to it. After the Step 3 plan approval (in yolo mode, once the plan is written) and before any voicing, run the script check:
 
    ```bash
    python3 -I <this skill's directory>/scripts/adopt_voice.py . --check-script
@@ -187,10 +187,10 @@ Each worker's dispatch context lists that frame's word timings from `audio_meta.
       python3 -I <this skill's directory>/scripts/qc_video.py . --normalize
       ```
 
-   2. Check the result against the run's target length in seconds (yolo: 75):
+   2. Check the result against the run's target length: seconds (`75`), or a range as answered (`60-90`, the default; yolo: `75`):
 
       ```bash
-      python3 -I <this skill's directory>/scripts/qc_video.py . --check <target seconds>
+      python3 -I <this skill's directory>/scripts/qc_video.py . --check <target seconds or range>
       ```
 
       It fails, listing each problem, when the video is not H.264 `yuv420p` at 1920x1080, has no audio stream, has a black span of 0.5 seconds or more, or has a length more than 12% off the target.

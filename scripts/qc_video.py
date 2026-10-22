@@ -3,6 +3,7 @@
 
     python3 -I qc_video.py <project_dir> --normalize         # renders/video.mp4 loudness to -16 LUFS, video copied
     python3 -I qc_video.py <project_dir> --check <seconds>   # format, audio, black spans and length against the target
+    python3 -I qc_video.py <project_dir> --check 60-90       # a target range: the length may fall anywhere in it
 
 Standard library only. ffprobe and ffmpeg are reached through three small functions that tests replace.
 """
@@ -52,7 +53,18 @@ def fail(lines):
     return 1
 
 
-def problems_of(video, target_s, probe, black_spans):
+def parse_target(text):
+    """"75" -> (75, 75); "60-90" -> (60, 90); anything else -> None."""
+    try:
+        low, high = (float(x) for x in (text.split("-", 1) if "-" in text.lstrip("-") else (text, text)))
+    except ValueError:
+        return None
+    ok = math.isfinite(low) and math.isfinite(high) and 0 < low <= high
+    return (low, high) if ok else None
+
+
+def problems_of(video, target, probe, black_spans):
+    low, high = target
     info = probe(video)
     video_stream = next((s for s in info["streams"] if s.get("codec_type") == "video"), {})
     problems = []
@@ -65,9 +77,9 @@ def problems_of(video, target_s, probe, black_spans):
     if not any(s.get("codec_type") == "audio" for s in info["streams"]):
         problems.append("no audio stream")
     problems += [f"black from {a:.1f}s to {b:.1f}s" for a, b in black_spans(video)]
-    if abs(info["duration"] - target_s) > LENGTH_TOLERANCE * target_s:
-        problems.append(f"length {info['duration']:.1f}s is outside {target_s:g}s plus or minus "
-                        f"{LENGTH_TOLERANCE:.0%}")
+    if not low * (1 - LENGTH_TOLERANCE) <= info["duration"] <= high * (1 + LENGTH_TOLERANCE):
+        span = f"{low:g}s" if low == high else f"{low:g}-{high:g}s"
+        problems.append(f"length {info['duration']:.1f}s is outside {span} plus or minus {LENGTH_TOLERANCE:.0%}")
     return problems
 
 
@@ -86,18 +98,18 @@ def normalize(p, loudnorm):
     return 0
 
 
-def check(p, target_s, probe, black_spans):
+def check(p, target, probe, black_spans):
     video = p / "renders/video.mp4"
     if not video.is_file():
         return fail([f"{video} not found"])
-    problems = problems_of(video, target_s, probe, black_spans)
+    problems = problems_of(video, target, probe, black_spans)
     if problems:
         return fail(problems)
     print("qc: pass")
     return 0
 
 
-USAGE = "usage: qc_video.py <project_dir> (--normalize | --check TARGET_SECONDS)"
+USAGE = "usage: qc_video.py <project_dir> (--normalize | --check SECONDS | --check MIN-MAX)"
 
 
 def main(argv, probe=probe, black_spans=black_spans, loudnorm=loudnorm):
@@ -105,13 +117,10 @@ def main(argv, probe=probe, black_spans=black_spans, loudnorm=loudnorm):
     if len(argv) == 2 and argv[1] == "--normalize":
         return normalize(Path(argv[0]), loudnorm)
     if len(argv) == 3 and argv[1] == "--check":
-        try:
-            target_s = float(argv[2])
-        except ValueError:
+        target = parse_target(argv[2])
+        if target is None:
             return fail([USAGE])
-        if not math.isfinite(target_s) or target_s <= 0:
-            return fail([USAGE])
-        return check(Path(argv[0]), target_s, probe, black_spans)
+        return check(Path(argv[0]), target, probe, black_spans)
     return fail([USAGE])
 
 

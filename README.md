@@ -8,7 +8,7 @@ You give it one or more links or files. It reads them, writes a digest of why ea
 
 Every video opens with an intro scene: the approved title on screen, narrated by one short sentence on what the video is about. When the feature can be shown, a demo scene shows it: a mock or a screen recording found in your sources or given by you. You can skip the demo.
 
-Stages: sources, digest, title and demo (you approve), script (you approve), voicing, frame plan (you approve), sketches (you approve), claim check, preview (you approve), render, cover frame and caption. With `--yolo`, the skill makes every approval itself (see [First run](#first-run)).
+Stages: sources, digest, title and demo (you approve), script (you approve), voicing, frame plan (you approve), sketches (you approve), claim check, preview (you approve), render, video check, cover frame and caption. With `--yolo`, the skill makes every approval itself (see [First run](#first-run)).
 
 Every run has its own folder with a `RUN.md` that records the stage and each approval, so an interrupted run can be resumed.
 

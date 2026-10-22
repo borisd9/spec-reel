@@ -123,7 +123,7 @@ Write `user_script.txt` at the run folder root in the format of the installed Hy
 - the first line is always the intro, `## Line 1 — Intro (Frame 1)`: one short sentence (at most 20 words) saying what this video is about, for example "This is a quick tour of the new upload flow and what it means for your team." Its scene shows the approved title. The user may reword the intro but not remove it;
 - with a demo, one `## Line N — Demo (Frame N)` line per demo file, in the "what it changes" part, describing what the viewer sees on it (`references/demo.md`); without one, no Demo line;
 - Line N and Frame N carry the same number, counting up one per line from 1;
-- total length within the target length, at about 150 words per minute;
+- total length within the target length: the words at about 150 words per minute, plus `slide_pause_s` after every line but the last;
 - spoken text uses only points from the approved digest;
 - a point tagged `[in progress]` or `[planned]` is spoken in the future tense ("will", "is being built"), never as done; only `[shipped]` points are spoken in the past or present tense.
 
