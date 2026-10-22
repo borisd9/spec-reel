@@ -1,0 +1,19 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
+    #progress-fill { position: absolute; left: 0; bottom: 0; width: 1920px; height: 6px; background: var(--color-accent, #1e2bfa); transform-origin: 0 50%; }
+  </style>
+  <div id="root" data-composition-id="progress" data-width="1920" data-height="1080">
+    <div id="progress-fill" data-layout-ignore></div>
+  </div>
+  <script>
+    (() => {
+      // The blue-professional progress strip: grows one step at each frame start.
+      const d = Object.values(window.__DUR), n = d.length, tl = gsap.timeline({ paused: true });
+      gsap.set("#progress-fill", { scaleX: 1 / n });
+      let t = 0;
+      d.forEach((len, i) => { if (i) tl.to("#progress-fill", { scaleX: (i + 1) / n, duration: 0.5, ease: "power2.inOut" }, t); t += len; });
+      window.__timelines["progress"] = tl;
+    })();
+  </script>
+</template>

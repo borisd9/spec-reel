@@ -22,10 +22,10 @@ The host's own permission prompts (for `npx`, `ffmpeg`, `uv`, `curl`, `gh`) are 
 | Gate 1: digest and title | Wait for approval | Re-read the digest once against `sources/` (each point present, no names or personal data, title at most eight words), fix what fails, drop every `[NEED: ...]` point and list it for the report, record `gate 1 (digest): auto (yolo) <time> sha256 <hash>`. |
 | Demo question | Ask | Take the first candidate that downloads without a sign-in. Look at it before using it: the image itself, or for a recording every second of the part the video uses (after any trim), at full readable size: `ffmpeg -loglevel error -i public/demo-NN.mp4 -vf "fps=1,scale='min(1280,iw)':-2" demo-in/check-%03d.png`, then view each PNG. Skip it when any of them shows a real person's name, email or face, customer data, or anything like a key or token. A recording longer than 60 seconds after trimming is skipped. No usable candidate: `demo: skipped`. |
 | Gate 2: script | Wait for approval | Check it against the script rules (intro of at most 20 words, total within 75 seconds counting the words at 150 words per minute plus `slide_pause_s` after every line but the last, only digest points, tense matching each point's status tag, `references/style.md`), fix what fails, record `gate 2 (script): auto (yolo) <time> sha256 <hash>`. |
-| faceless-explainer plan review and sketches | Reviewed | `BRIEF.md` has `storyboard: no`, so faceless-explainer runs autonomously: no plan question, no sketch board. |
+| Frame plan review | Reviewed | `STORYBOARD.md` has `mode: autonomous`: no plan review; the scenes are built straight from the script. |
 | Speech check: a line still differs after two retakes | Ask keep, reword or add a pronunciation | Keep it and list it in the report. |
 | Voice check failure | Offer to switch voice source | Stop and list the frames. |
-| faceless-explainer's render-or-changes question | Ask | Do not ask and do not open the preview: run the claim check, render, and continue. |
+| Review stills and the render-or-changes question | Ask | Do not ask and do not open the preview: run the claim check, `finish.py . --review` (it must pass), then `finish.py . --final` once, and continue. |
 | Sync difference above 2 seconds | Report before `done` | Report it in the final report. |
 | Video QC failure | Report before `done` | Report it in the final report. |
 

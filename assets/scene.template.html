@@ -1,0 +1,30 @@
+<template>
+  <!--
+    One scene = one script line. Copy to compositions/<id>.html, where <id> is the name the storyboard gives in
+    "- src: compositions/<id>.html", and replace every SCENE_ID. The classes (.stage .eyebrow .title .card .label
+    .label-ink .num .accent .tag ...) and the window.fx helpers come from index.html (assets/index.template.html), not from here.
+    Cue reveals on the words: at("word") is the start of the first "word", at("word", 2) of the second one.
+    f.fact("key") reads facts.json. Never use CSS filters (blur, drop-shadow): they slow the render down.
+  -->
+  <style>
+    #root { position: absolute; inset: 0; }
+    /* Scene styles go here; prefix every id with the scene id. */
+  </style>
+  <div id="root" data-composition-id="SCENE_ID" data-width="1920" data-height="1080">
+    <div id="SCENE_ID-stage" class="stage">
+      <div id="SCENE_ID-eyebrow" class="eyebrow">Why it exists</div>
+      <h2 id="SCENE_ID-title" class="title">Scene title</h2>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const S = "SCENE_ID", f = window.fx, D = window.__DUR[S], at = f.at(S);
+      const tl = gsap.timeline({ paused: true });
+      f.blur(tl, "#SCENE_ID-eyebrow", 0.05);
+      f.blur(tl, "#SCENE_ID-title", 0.12);
+      // f.rise(tl, "#SCENE_ID-card", at("WORD"));
+      f.exit(tl, "#SCENE_ID-stage", D);
+      window.__timelines[S] = tl;
+    })();
+  </script>
+</template>

@@ -1,16 +1,16 @@
 ---
 name: spec-reel
-description: "Turn links to plans and specs into a short narrated explainer video. Asks for the sources, audience and length, reads them into an approved digest, picks a demo mock or recording when one exists, writes an approved timestamped script with a title intro, voices it locally with Qwen3-TTS (or the user's own TTS), then has HyperFrames faceless-explainer build synced scenes and render an MP4. Use for requests like 'make a video explaining this plan', 'turn these specs into a narrated update video', 'short video of what this feature changes', 'explainer video from these docs for the team'. For a single document with no review gates or own-voice option, faceless-explainer alone is enough."
+description: "Turn links to plans and specs into a short narrated explainer video. Asks for the sources, audience and length, reads them into an approved digest, picks a demo mock or recording when one exists, writes an approved timestamped script with a title intro, voices it locally with Qwen3-TTS (or the user's own TTS), then builds one synced scene per line with the HyperFrames explainer route and renders an MP4. Use for requests like 'make a video explaining this plan', 'turn these specs into a narrated update video', 'short video of what this feature changes', 'explainer video from these docs for the team'. For a single document with no review gates or own-voice option, the hyperframes skill alone is enough."
 argument-hint: "[--yolo] links or paths to plans and specs"
 ---
 
 # Spec Reel
 
-Links or files of plans and specs in, a narrated MP4 out. This skill owns the sources, the digest, the script and the review gates. It hands scene building and rendering to the installed `faceless-explainer` skill, with six small deltas.
+Links or files of plans and specs in, a narrated MP4 out. This skill owns the sources, the digest, the script, the voice, the review gates and the scripts that build and render (`scripts/`). It builds the scenes with the installed HyperFrames explainer route, `~/.claude/skills/hyperframes/references/types/explainer.md`.
 
-Stages: sources, digest, title and demo (gate 1), script (gate 2), frame plan, sketches, preview, render. The user approves at each gate; nothing is voiced or built before gate 2.
+Stages: sources, digest, title and demo (gate 1), script (gate 2), frame plan, scenes, review stills, render. The user approves at each gate; nothing is voiced or built before gate 2.
 
-Do not invoke the `hyperframes` skill through the Skill tool (it may be disabled for model invocation). Read the installed faceless-explainer `SKILL.md` directly: `~/.claude/skills/faceless-explainer/SKILL.md`.
+Do not invoke the `hyperframes` skill through the Skill tool (it may be disabled for model invocation). Read its files directly, under `~/.claude/skills/hyperframes/`.
 
 `<this skill's directory>` below means the folder that holds this `SKILL.md`.
 
@@ -37,7 +37,7 @@ Every run has one folder holding all its artifacts, and a `RUN.md` that records 
 
 Run folders are never deleted.
 
-**Resume:** show the recorded run answers in one line and continue from the recorded stage. Do not ask the run questions again, read the sources again, or regenerate approved work. Before continuing, compare each approved file's SHA-256 with the one in `RUN.md`. When one differs, tell the user which file changed and re-open its gate: a changed digest re-opens gate 1 and then gate 2; a changed `user_script.txt` re-opens gate 2 and then re-runs faceless-explainer's Step 3. At stage `faceless`, read `references/handoff.md` and faceless-explainer's `SKILL.md` again before acting.
+**Resume:** show the recorded run answers in one line and continue from the recorded stage. Do not ask the run questions again, read the sources again, or regenerate approved work. Before continuing, compare each approved file's SHA-256 with the one in `RUN.md`. When one differs, tell the user which file changed and re-open its gate: a changed digest re-opens gate 1 and then gate 2; a changed `user_script.txt` re-opens gate 2 and then re-runs the frame plan and the scenes. At stage `scenes`, read `references/handoff.md` and the explainer route again before acting.
 
 **New run:** ask these in one batch (defaults in brackets):
 
@@ -46,26 +46,25 @@ Run folders are never deleted.
 3. The target length [60-90 seconds, a team update].
 4. The voice source: Qwen3-TTS on this Mac [config `voice_source`, default], or the user's own TTS engine.
 
-Then, from the folder that will contain the run folder:
+Then check that the files this skill needs exist (the loop under "Files this skill needs" in `references/handoff.md`); when one is missing, stop and name it. Then, from the folder that will contain the run folder:
 
 ```bash
-npx hyperframes init "<folder>" --non-interactive --example=blank --skill=faceless-explainer
+npx hyperframes init "<folder>" --non-interactive --example=blank --skill=spec-reel
 ```
 
 `init` refuses a non-empty folder, so write nothing into it before this command finishes. Then write `RUN.md`:
 
 ```markdown
-faceless-explainer deltas in force: skip the update question and continue offline at Step 0; this skill's voicing replaces Step 3.1; voice check after voicing, after fetch-sfx and after any re-voice; script lines one-to-one with frames, Frame 1 the title intro, each demo file on its Demo frame; Step 6 rebuilds named frames only; claim check before the preview review. Full text: <this skill's directory>/references/handoff.md.
-
 # Run <folder name>
 
-stage: sources            # sources | digest | script | faceless | done
+stage: sources            # sources | digest | script | scenes | done
 
 ## Answers
 - sources: <links or paths as given>
 - audience: ...
 - intent: ...
 - length: ...
+- target: <seconds, or a range like 60-90; yolo: 75>
 - voice source: qwen (speaker) | own   (own: whether a tts_command was used, never its text)
 - pause: <slide_pause_s>s   captions: off | on
 - mode: interactive | yolo
@@ -87,7 +86,7 @@ stage: sources            # sources | digest | script | faceless | done
 - cover: <s>
 ```
 
-Replace `<this skill's directory>` in the first line with the real path. Update `stage` as each stage starts. Compute hashes with `shasum -a 256 <file>`.
+Update `stage` as each stage starts. Compute hashes with `shasum -a 256 <file>`.
 
 ## Sources
 
@@ -116,7 +115,7 @@ Set `stage: digest`.
 
 Set `stage: script`.
 
-Write `user_script.txt` at the run folder root in the format of the installed HyperFrames `references/script-format.md`:
+Write `user_script.txt` at the run folder root. It is the only script file you edit: `SCRIPT.md` is generated from it. Write numbers, names and acronyms in their written form ("PR 12", "v8", "ids"): the voice respells them (`references/handoff.md` § Pronunciation). A fact that repeats across the video goes in `facts.json` and is written `{{key}}` (§ Facts). The format:
 
 - header line `**Voice:**` naming "Qwen3-TTS · <config qwen_speaker>", or "your own engine" for the own source;
 - one section per spoken line: `## Line N — <label> (Frame N)`, then `**Time:**`, then `**Delivery:**`, then the spoken text indented four spaces;
@@ -127,35 +126,33 @@ Write `user_script.txt` at the run folder root in the format of the installed Hy
 - spoken text uses only points from the approved digest;
 - a point tagged `[in progress]` or `[planned]` is spoken in the future tense ("will", "is being built"), never as done; only `[shipped]` points are spoken in the past or present tense.
 
-Before showing the script, check it against `references/style.md` and fix what fails.
+Before showing the script, check it against `references/style.md` and fix what fails, then run `adopt_voice.py . --check-script` (`references/handoff.md` § Script check) and fix what it reports. A concept a `next` line names gets one sentence on what it will do.
 
 Show the title, the script, its word count and estimated length, and one line on where the text goes:
 
 - Qwen3-TTS: "This script is voiced on this Mac with Qwen3-TTS; the text does not leave the machine."
-- own source: "You voice this script with your own engine after the frame plan is approved."
+- own source: "You voice this script with your own engine once you approve it."
 
 Wait for approval or edits; loop until approved. Record the approval time and SHA-256 in `RUN.md`. Nothing is voiced or built before this approval.
 
 ## Scenes
 
-Set `stage: faceless`. Everything from here is in `references/handoff.md`; read it now. In short:
+Set `stage: scenes`. Everything from here is in `references/handoff.md`; read it now. In short:
 
-1. Write `BRIEF.md` from its template, with `vo_mode: verbatim` and the delta line in `## Notes` (`storyboard: no` and the yolo note in yolo mode).
-2. Follow the installed faceless-explainer `SKILL.md` Steps 0 to 6 with the six deltas:
-   - The update question is skipped; at Step 0 the sign-in status is relayed and the run continues offline, since this skill makes the narration.
-   - Step 3 keeps `user_script.txt`'s lines one-to-one as frames, and Frame 1 is the intro: the approved title on screen (`on_screen_title`) with the intro line as its voiceover. Every other frame carries a `scene_job` (`why`, `change`, `proof` or `next`), and a `change` frame also `before` and `after`. Each Demo frame names its `public/demo-NN` file in `asset_candidates` and uses it as the focal element. After the plan approval run the script check (`adopt_voice.py . --check-script`) before any voicing.
-   - Voice: this skill replaces Step 3.1. Qwen3-TTS (`scripts/qwen_voice.py` through `uv run`) or the user's own engine writes one file per line into `voice-in/`, then `adopt_voice.py . --pause <slide_pause_s>` adds word timings and the pause. The speech check (`adopt_voice.py . --check-speech`) lists lines heard differently from the script, with up to two retakes. A run never mixes the two.
-   - Voice check (`adopt_voice.py . --check`) after voicing, after Step 5's `fetch-sfx`, and after any re-voice. On failure stop and list the frames.
-   - The user reviews the frame plan, the sketch board and the final preview before the render. Music is `none`; captions follow the config `captions`.
-   - A change request at the preview rebuilds only the named frames, plus any frame whose length changes.
-   - Before the preview review, the claim check: every name, number, date, status or capability shown on screen must come from the approved digest or the sources, and its tense must match the point's status tag; ungrounded lines are reworded in the digest's terms.
-3. After the render, run the sync check, then the video QC (`scripts/qc_video.py`: loudness to -16 LUFS, then format, black spans and length), make the intro title the video's first frame (the thumbnail chat apps show), write a one-to-three-sentence `renders/share-copy.txt` from the approved digest and check it against `references/style.md`, set `stage: done`, and report the MP4 path, its length, the sync difference, the QC result, the cover time, the caption and the frame ids.
+1. Right after gate 2, start Qwen3-TTS voicing and `adopt_voice.py` **in the background**, and write `STORYBOARD.md` and the scenes while they run. Cues need `audio_meta.json` only at build time.
+2. `STORYBOARD.md`: one frame per script line, Frame 1 the intro with the approved title as `on_screen_title`, every other frame a `scene_job`, each frame's scene id as `src: compositions/<id>.html`. In interactive mode the user reviews the frame plan before the scenes are built; in yolo mode (`mode: autonomous`) there is no review.
+3. Build one scene per frame from `assets/scene.template.html` (the explainer route: one concrete example, a diagram that grows, the voice as the clock). Cue reveals on word text, `at("feed")`. No CSS filters. Music is `none`; captions follow the config `captions`.
+4. Before the review, the claim check: every name, number, date, status or capability shown on screen must come from the approved digest or the sources, and its tense must match the point's status tag; ungrounded lines are reworded in the digest's terms.
+5. **Preview.** `scripts/finish.py . --review` voice-checks, builds, and looks at the scenes that changed: a layout and contrast check plus a still of each. Show the stills; do not render yet. A change request rebuilds the named scenes (plus any whose length changes), runs `--review` again and shows their stills. The one full render, `scripts/finish.py . --final`, runs after the user approves, or once at the end in yolo mode. A change that brings a new source follows `references/handoff.md` § Change requests.
+6. After the render `--final` has made the MP4, normalized its loudness, checked its format, black spans and length, put the intro title on frame 0 as the cover, and written the sync, QC and cover lines to `RUN.md`. Then write `renders/share-copy.txt`, set `stage: done`, and report the MP4 path, its length, the sync difference, the QC result, the cover time, the caption and the frame ids. A QC failure does not stop `--final`: it still adds the cover and the `RUN.md` lines, then exits non-zero. Ask the user what to do about it (yolo: list it in the report).
+
+**When a `finish.py` step fails** and the cause is in the run's own files, fix it and run the same command again, without asking: a cue on a word the line no longer says (cue on the word it says now), overflowing or low-contrast text, a CSS filter or an `onUpdate` callback in a scene, a `{{key}}` missing from `facts.json` whose value is in the approved digest. At most three tries per failure. A fix never changes the spoken text and never adds a fact the digest lacks: those go to the user (yolo: decide and list them in the report).
 
 ## Stop conditions
 
 Stop and tell the user, without improvising, when:
 
-- faceless-explainer Step 0 no longer treats an existing `BRIEF.md` as "ask nothing", or no longer accepts `vo_mode: verbatim` with `user_script.txt` at the project root;
-- faceless-explainer's `audio.mjs` or its `lib/host-audio.mjs` needs a voice or word field that `references/handoff.md` and `scripts/adopt_voice.py` do not write;
+- a file the skill needs is missing under `~/.claude/skills/hyperframes/` (name it) or `npx hyperframes check --help` fails;
 - a step would need the `hyperframes` skill through the Skill tool;
-- a voice check fails and the user declines to switch voice source.
+- a voice check fails and the user declines to switch voice source;
+- a `finish.py` step still fails after three fixes, or its cause is not in the run's own files (a scene, the script, the voice): say which step and show the error.
