@@ -1,0 +1,77 @@
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: tests (${{ matrix.os }}, ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, python: "3.10" }
+          - { os: ubuntu-latest, python: "3.13" }
+          - { os: macos-latest, python: "3.13" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -I -m unittest discover -s scripts -p 'test_*.py' -v
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ruff==0.6.9 && ruff check scripts
+
+  secrets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false
+
+  # The word list is the LEAK_PATTERNS repository secret, so the names it guards are not
+  # published here. Pull requests from forks get no secrets; the scan is skipped for them.
+  internal-names:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan for internal names
+        env:
+          LEAK_PATTERNS: ${{ secrets.LEAK_PATTERNS }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$LEAK_PATTERNS" ]; then
+            echo "::notice::LEAK_PATTERNS is not available to this run; scan skipped."
+            exit 0
+          fi
+          if [ -n "$BASE" ]; then
+            git diff "$BASE"...HEAD -U0 | grep '^+' | grep -v '^+++' > scanned.txt || true
+          else
+            git ls-files -z | xargs -0 cat > scanned.txt
+          fi
+          if grep -inE -- "$LEAK_PATTERNS" scanned.txt; then
+            echo "::error::Internal names in the lines above; reword them."
+            exit 1
+          fi
