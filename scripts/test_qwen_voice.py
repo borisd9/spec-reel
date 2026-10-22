@@ -33,9 +33,10 @@ class Fake:
     def __init__(self):
         self.loads, self.calls = 0, []
 
-    def make(self, model, speaker, language, instruct):
+    def make(self, model, speaker, language, instruct, clone, tempo):
         self.loads += 1
         self.args = (model, speaker, language, instruct)
+        self.clone, self.tempo = clone, tempo
 
         def synthesize(text, out):
             self.calls.append(text)
@@ -68,6 +69,8 @@ class QwenVoiceTests(Base):
         self.assertEqual(self.fake.calls, ["Hello there.", "The middle line.", "Goodbye."])
         self.assertEqual(sorted(f.name for f in (self.p / "voice-in").iterdir()), ["00.wav", "01.wav", "02.wav"])
         self.assertEqual(self.fake.args[1:3], ("Aiden", "English"))
+        self.assertEqual(self.fake.args[0], qwen_voice.DEFAULT_MODEL)
+        self.assertEqual((self.fake.clone, self.fake.tempo), (None, 1.0))
 
     def test_frames_option_voices_only_those(self):
         (self.p / "voice-in").mkdir()
@@ -131,6 +134,55 @@ class QwenVoiceTests(Base):
         (self.p / "facts.json").write_text('{"ticket": "412"}')
         self.assertEqual(self.run_main("--frames", "2")[0], 0)
         self.assertEqual(self.fake.calls, ["Goodbye, ticket 412."])
+
+    def clone_files(self, transcript="  Exactly what I said.\n"):
+        audio, text = self.p / "me.wav", self.p / "me.txt"
+        audio.write_bytes(b"RIFF")
+        text.write_text(transcript)
+        return audio, text
+
+    def test_clone_options_reach_the_factory_with_the_base_model(self):
+        audio, text = self.clone_files()
+        code, _ = self.run_main("--clone-audio", str(audio), "--clone-transcript", str(text))
+        self.assertEqual(code, 0)
+        self.assertEqual(self.fake.args[0], qwen_voice.CLONE_MODEL)
+        self.assertEqual(self.fake.clone, (audio, "Exactly what I said."))
+        self.assertEqual(self.fake.calls, ["Hello there.", "The middle line.", "Goodbye."])
+
+    def test_clone_paths_expand_the_home_folder(self):
+        code, err = self.run_main("--clone-audio", "~/no-such-sample.wav", "--clone-transcript", "~/no-such.txt")
+        self.assertEqual(code, 1)
+        self.assertIn(f"{Path.home()}/no-such-sample.wav not found", err)
+
+    def test_clone_failures_name_the_problem_and_load_nothing(self):
+        audio, text = self.clone_files()
+        empty = self.p / "empty.txt"
+        empty.write_text(" \n")
+        for args, message in [
+            (["--clone-audio", str(audio)], "--clone-audio and --clone-transcript go together"),
+            (["--clone-transcript", str(text)], "--clone-audio and --clone-transcript go together"),
+            (["--clone-audio", str(self.p / "gone.wav"), "--clone-transcript", str(text)], "gone.wav not found"),
+            (["--clone-audio", str(audio), "--clone-transcript", str(self.p / "gone.txt")], "gone.txt not found"),
+            (["--clone-audio", str(audio), "--clone-transcript", str(empty)], f"{empty} is empty"),
+        ]:
+            code, err = self.run_main(*args)
+            self.assertEqual(code, 1)
+            self.assertIn(message, err)
+        self.assertEqual(self.fake.loads, 0)
+
+    def test_tempo_reaches_the_factory_and_out_of_range_fails_before_loading(self):
+        self.assertEqual(self.run_main("--frames", "2", "--tempo", "0.8")[0], 0)
+        self.assertEqual(self.fake.tempo, 0.8)
+        loads = self.fake.loads
+        for bad in ("0.3", "2.5"):
+            code, err = self.run_main("--tempo", bad)
+            self.assertEqual(code, 1)
+            self.assertIn("--tempo must be between 0.5 and 2.0", err)
+        self.assertEqual(self.fake.loads, loads)
+
+    def test_sentences_split_after_punctuation_and_a_version_stays_whole(self):
+        self.assertEqual(qwen_voice.sentences("One. Two? Three: four; five!"), ["One.", "Two?", "Three:", "four;", "five!"])
+        self.assertEqual(qwen_voice.sentences(" v8.1 shipped "), ["v8.1 shipped"])
 
     def test_missing_script(self):
         (self.p / "SCRIPT.md").unlink()

@@ -22,7 +22,7 @@ Config lives in `<this skill's directory>/config.json`, which is never committed
 
 1. When `config.json` is missing, copy `config.example.json` to `config.json`.
 2. When a value is empty where it is required (`output_root`, `style_preset`, `voice_source`), ask for all the missing ones in one batch, write them to `config.json`, and continue. Later runs ask nothing about setup.
-3. `voice_source` is `qwen` (Qwen3-TTS on this Mac, the default) or `own` (the user's own engine). `qwen_speaker` defaults to `Aiden` (`Ryan` is the other English voice). `qwen_instruct` (empty means a calm, conversational narrator) and `tts_command` (empty means the user drops audio files) may stay empty. `slide_pause_s` (default `1.0`, seconds of silence after every line but the last), `captions` (`off` default, or `on`) and `pronunciations` (respellings for Qwen3-TTS, for example `{"KBs": "K-Bs"}`) may stay at their defaults.
+3. `voice_source` is `qwen` (Qwen3-TTS on this Mac, the default), `own` (the user's own engine) or `clone` (the user's cloned voice, opt-in: never choose it unless the user picks it). `qwen_speaker` defaults to `Aiden` (`Ryan` is the other English voice). `qwen_instruct` (empty means a calm, conversational narrator) and `tts_command` (empty means the user drops audio files) may stay empty. `qwen_clone_audio` and `qwen_clone_transcript` (paths to a recording and to a file with its exact transcript, `~` allowed) are empty until the user picks the clone; setting them does not select it. `qwen_tempo` (default `1.0`, `0.5` to `2.0`, below 1 is slower) slows any Qwen3-TTS voice without changing pitch. `slide_pause_s` (default `1.0`, seconds of silence after every line but the last), `captions` (`off` default, or `on`) and `pronunciations` (respellings for Qwen3-TTS, for example `{"KBs": "K-Bs"}`) may stay at their defaults.
 4. `tts_command` uses `{text_file}` and `{out}` placeholders (see `references/handoff.md`) and never contains a credential. When asked to save a command that contains a key-like literal (a token, key or password), refuse and ask for the form where the command reads the key from an environment variable or a file outside this folder.
 
 ## Start or resume
@@ -44,7 +44,9 @@ Run folders are never deleted.
 1. The links or files of the plans and specs to explain (one or more).
 2. The audience and the intent (what the viewer should know or do afterwards).
 3. The target length [60-90 seconds, a team update].
-4. The voice source: Qwen3-TTS on this Mac [config `voice_source`, default], or the user's own TTS engine.
+4. The voice: Qwen3-TTS built-in speaker [config `voice_source`, default], your cloned voice, or your own TTS engine.
+
+When the user picks the cloned voice: if `qwen_clone_audio` or `qwen_clone_transcript` is empty, ask for both paths in one message and save them to `config.json`. The first time a sample is used, ask once whether it is the user's own voice or used with the speaker's permission; if not, use the default voice instead. Then check that both files exist; when one is missing, name it and offer the default voice.
 
 Then check that the files this skill needs exist (the loop under "Files this skill needs" in `references/handoff.md`); when one is missing, stop and name it. Then, from the folder that will contain the run folder:
 
@@ -65,7 +67,7 @@ stage: sources            # sources | digest | script | scenes | done
 - intent: ...
 - length: ...
 - target: <seconds, or a range like 60-90; yolo: 75>
-- voice source: qwen (speaker) | own   (own: whether a tts_command was used, never its text)
+- voice source: qwen (speaker) | clone | own   tempo: <qwen_tempo>   (own: whether a tts_command was used, never its text)
 - pause: <slide_pause_s>s   captions: off | on
 - mode: interactive | yolo
 
@@ -117,7 +119,7 @@ Set `stage: script`.
 
 Write `user_script.txt` at the run folder root. It is the only script file you edit: `SCRIPT.md` is generated from it. Write numbers, names and acronyms in their written form ("PR 12", "v8", "ids"): the voice respells them (`references/handoff.md` § Pronunciation). A fact that repeats across the video goes in `facts.json` and is written `{{key}}` (§ Facts). The format:
 
-- header line `**Voice:**` naming "Qwen3-TTS · <config qwen_speaker>", or "your own engine" for the own source;
+- header line `**Voice:**` naming "Qwen3-TTS · <config qwen_speaker>", "Qwen3-TTS · cloned voice", or "your own engine" for the own source;
 - one section per spoken line: `## Line N — <label> (Frame N)`, then `**Time:**`, then `**Delivery:**`, then the spoken text indented four spaces;
 - the first line is always the intro, `## Line 1 — Intro (Frame 1)`: one short sentence (at most 20 words) saying what this video is about, for example "This is a quick tour of the new upload flow and what it means for your team." Its scene shows the approved title. The user may reword the intro but not remove it;
 - with a demo, one `## Line N — Demo (Frame N)` line per demo file, in the "what it changes" part, describing what the viewer sees on it (`references/demo.md`); without one, no Demo line;
@@ -130,7 +132,7 @@ Before showing the script, check it against `references/style.md` and fix what f
 
 Show the title, the script, its word count and estimated length, and one line on where the text goes:
 
-- Qwen3-TTS: "This script is voiced on this Mac with Qwen3-TTS; the text does not leave the machine."
+- Qwen3-TTS, built-in speaker or cloned voice: "This script is voiced on this Mac with Qwen3-TTS; the text does not leave the machine."
 - own source: "You voice this script with your own engine once you approve it."
 
 Wait for approval or edits; loop until approved. Record the approval time and SHA-256 in `RUN.md`. Nothing is voiced or built before this approval.
