@@ -180,7 +180,7 @@ The cover: chat apps and most players show a video's first frame as the thumbnai
 
 Speed, measured on a 3-minute, 17-scene video: with CSS blur filters the render took 3 m 30 s to 3 m 54 s (screenshot capture); without them, fast capture takes 1 m 55 s on one worker, and 45 s with `HF_DE_PARALLEL_ROUTER=true`, which `finish.py` sets for the render (same frames, PSNR 72 dB). The render log must not hold a `falling back to screenshot` line; when it does, a scene breaks fast capture: look for a callback that edits the page. Transcription uses Whisper `medium.en` explicitly (`--engine whisper`): Parakeet was no faster on this video (42 s against 43 s for 17 files) and misheard more words. Segmented capture (`HF_SEGMENTED_CAPTURE`, `--resume`) failed on this video (`suspect small frame`), so it is not used.
 
-A sync difference above 2 seconds (voice total against the MP4's length) is written to `RUN.md` with a note; report it to the user before marking the run `done`. A QC failure is reported too; it does not stop the run.
+A sync difference above 2 seconds (voice total against the MP4's length) is written to `RUN.md` with a note; report it to the user before marking the run `done`. A QC failure stops `--final` at that step, before the cover: fix the cause and run it again, or report the failure before marking the run `done`.
 
 ## After the render
 

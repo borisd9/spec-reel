@@ -364,7 +364,7 @@ class HeardTests(unittest.TestCase):
                 ("The PR 412 build ships on v8 with ids", "The PR412, build ships on V8 with IDs"),
                 ("web V-eight index", "webv8 index"),
                 ("the same doc id.", "the same docid."),
-                ("Web search skips datahub", "WebSearch skips data hub"),
+                ("Web search skips the metadata store", "WebSearch skips the meta data store"),
                 ("forty-five of ten", "45 of 10"),
                 ("sixty-nine percent of them", "69% of them"),
                 ("a hundred per search", "100 per search"),
