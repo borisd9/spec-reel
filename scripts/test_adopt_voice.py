@@ -32,19 +32,25 @@ SCRIPT = """# SCRIPT
 """
 
 
-def fake_to_wav(src, dst):
+def fake_to_wav(src, dst, pad_s=0.0):
     if Path(src).read_text() == "BAD":
         raise RuntimeError("cannot decode")
-    Path(dst).write_text(Path(src).read_text())
+    Path(dst).write_text(Path(src).read_text() + (f"\nPAD {pad_s}" if pad_s > 0 else ""))
+
+
+def spoken(wav):
+    """The fake wav's words and its padding, split at the PAD marker line."""
+    text, _, pad = Path(wav).read_text().partition("\nPAD ")
+    return text.split(), float(pad or 0)
 
 
 def fake_probe(wav):
-    return 1.0 + 0.5 * len(Path(wav).read_text().split())
+    words, pad = spoken(wav)
+    return 1.0 + 0.5 * len(words) + pad
 
 
 def fake_transcribe(wav):
-    return [{"text": t, "start": i * 0.5, "end": i * 0.5 + 0.4}
-            for i, t in enumerate(Path(wav).read_text().split())]
+    return [{"text": t, "start": i * 0.5, "end": i * 0.5 + 0.4} for i, t in enumerate(spoken(wav)[0])]
 
 
 class Base(unittest.TestCase):
@@ -104,7 +110,11 @@ class AdoptTests(Base):
         self.assertEqual((self.p / "assets/voice/01.wav").read_text(), "shipped it")
         for name, key in (("audio_meta.json", "frame"), ("audio_engine_meta.json", "id")):
             v = [x for x in self.meta(name)["voices"] if x[key] in (1, "01")][0]
-            self.assertEqual([w["text"] for w in v["words"]], ["shipped", "it"])
+            # the words are the script's, on the timings of the replaced file ("it" is 2 of 3 tokens)
+            self.assertEqual([w["text"] for w in v["words"]], ["Shipped", "the", "thing."])
+            self.assertEqual(v["words"][-1]["end"], 0.9)
+        self.assertEqual([w["text"] for w in json.loads((self.p / "voice_heard.json").read_text())["1"]],
+                         ["shipped", "it"])
 
     def test_rerun_keeps_sfx_and_host_entries(self):
         self.three_files()
@@ -164,6 +174,76 @@ class AdoptTests(Base):
         self.assertFalse((self.p / "audio_meta.json").exists())
 
 
+class SpeechTests(Base):
+    def misheard(self):
+        self.three_files()
+        self.voice_in("01.wav", "shipped the thang")
+
+    def test_adopt_keeps_script_words_saves_heard_and_reports(self):
+        self.misheard()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = av.main([str(self.p)], to_wav=fake_to_wav, probe_duration=fake_probe, transcribe=fake_transcribe)
+        self.assertEqual(code, 0)
+        v1 = [v for v in self.meta()["voices"] if v["frame"] == 1][0]
+        self.assertEqual([w["text"] for w in v1["words"]], ["Shipped", "the", "thing."])
+        heard = json.loads((self.p / "voice_heard.json").read_text())
+        self.assertEqual([w["text"] for w in heard["1"]], ["shipped", "the", "thang"])
+        self.assertEqual(sorted(heard), ["0", "1", "2"])
+        self.assertIn('frame 1: heard "thang" for "thing."', out.getvalue())
+        self.assertIn("--check-speech", out.getvalue())
+
+    def test_pause_pads_every_voice_but_the_last_frames(self):
+        self.three_files()
+        self.run_main()
+        base = {v["frame"]: v["duration_s"] for v in self.meta()["voices"]}
+        self.assertEqual(self.run_main("--pause", "1.5")[0], 0)
+        got = {v["frame"]: v["duration_s"] for v in self.meta()["voices"]}
+        self.assertEqual((got[0], got[1]), (base[0] + 1.5, base[1] + 1.5))
+        self.assertEqual(got[2], base[2])
+
+    def test_bad_pause_is_a_usage_failure(self):
+        self.three_files()
+        for bad in (["--pause", "abc"], ["--pause", "-1"], ["--pause"], ["--pause", "1", "--check"]):
+            code, err = self.run_main(*bad)
+            self.assertEqual(code, 1, bad)
+            self.assertIn("usage: adopt_voice.py", err)
+            self.assertIn("--pause SECONDS", err)
+
+    def test_check_speech_passes_when_heard_equals_script(self):
+        self.three_files()
+        self.run_main()
+        self.assertEqual(self.run_main("--check-speech"), (0, ""))
+
+    def test_check_speech_names_the_frame_that_differs(self):
+        self.misheard()
+        self.run_main()
+        code, err = self.run_main("--check-speech")
+        self.assertEqual(code, 1)
+        self.assertIn('frame 1: heard "thang" for "thing."', err)
+        self.assertNotIn("frame 0", err)
+
+    def test_check_speech_reports_unvoiced_frame(self):
+        self.three_files()
+        self.run_main()
+        heard = json.loads((self.p / "voice_heard.json").read_text())
+        del heard["2"]
+        (self.p / "voice_heard.json").write_text(json.dumps(heard))
+        code, err = self.run_main("--check-speech")
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2: not voiced", err)
+
+    def test_check_speech_without_voice_heard(self):
+        code, err = self.run_main("--check-speech")
+        self.assertEqual(code, 1)
+        self.assertIn("voice_heard.json not found", err)
+
+    def test_failed_adopt_writes_no_voice_heard(self):
+        self.voice_in("00.mp3", "hello there team")
+        self.run_main()
+        self.assertFalse((self.p / "voice_heard.json").exists())
+
+
 STORYBOARD = """---
 format: 1920x1080
 ---
@@ -182,6 +262,43 @@ format: 1920x1080
 
 - voiceover: "Next up is more."
 """
+
+
+class AlignTests(unittest.TestCase):
+    @staticmethod
+    def heard(*texts):
+        return [{"text": t, "start": i * 0.5, "end": i * 0.5 + 0.4} for i, t in enumerate(texts)]
+
+    def test_equal_tokens_keep_script_punctuation_and_heard_timings(self):
+        out = av.align_words("It checks, then ships.", self.heard("it", "checks", "then", "ships"))
+        self.assertEqual([w["text"] for w in out], ["It", "checks,", "then", "ships."])
+        self.assertEqual((out[1]["start"], out[1]["end"]), (0.5, 0.9))
+
+    def test_misheard_word_gets_script_text_and_heard_timing(self):
+        out = av.align_words("a reusable KB", self.heard("a", "resubil", "KB"))
+        self.assertEqual([w["text"] for w in out], ["a", "reusable", "KB"])
+        self.assertEqual((out[1]["start"], out[1]["end"]), (0.5, 0.9))
+
+    def test_extra_heard_word_is_dropped(self):
+        out = av.align_words("it ships", self.heard("it", "it", "ships"))
+        self.assertEqual([w["text"] for w in out], ["it", "ships"])
+        self.assertEqual(out[1]["start"], 1.0)
+
+    def test_script_word_nobody_said_is_zero_length_after_the_previous(self):
+        out = av.align_words("it really ships", self.heard("it", "ships"))
+        self.assertEqual([w["text"] for w in out], ["it", "really", "ships"])
+        self.assertEqual((out[1]["start"], out[1]["end"]), (out[0]["end"], out[0]["end"]))
+
+    def test_two_script_tokens_for_one_heard_token_split_its_span(self):
+        out = av.align_words("pre publish", self.heard("prepublish"))
+        self.assertEqual([(w["start"], w["end"]) for w in out], [(0.0, 0.2), (0.2, 0.4)])
+
+    def test_speech_diffs_reports_a_misheard_word(self):
+        self.assertEqual(av.speech_diffs("we pre-publish it", self.heard("we", "pre-published", "it")),
+                         [("pre-publish", "pre-published")])
+
+    def test_speech_diffs_ignores_digits_for_number_words(self):
+        self.assertEqual(av.speech_diffs("forty-five of ten", self.heard("45", "of", "10")), [])
 
 
 class CheckTests(Base):

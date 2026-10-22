@@ -2,12 +2,14 @@
 """Voice SCRIPT.md lines on this Mac with Qwen3-TTS (through MLX-Audio) into voice-in/NN.wav.
 
     uv run --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
-        python <skill dir>/scripts/qwen_voice.py <project_dir> [--frames 1 3] [--speaker Aiden]
+        python <skill dir>/scripts/qwen_voice.py <project_dir> [--frames 1 3] [--speaker Aiden] \
+        [--say KBs=K-Bs ...]
 
 Then run adopt_voice.py on the same project, exactly as for audio from the user's own engine.
 Needs an Apple Silicon Mac. The model downloads once (about 4 GB) into the Hugging Face cache.
 """
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -17,6 +19,13 @@ from adopt_voice import EXTS, parse_script  # noqa: E402
 DEFAULT_MODEL = "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16"
 DEFAULT_SPEAKER = "Aiden"
 DEFAULT_INSTRUCT = "Calm, clear and friendly, a conversational narrator explaining a product update to teammates."
+
+
+def respell(text, pairs):
+    """Whole-word, case-sensitive WRITTEN -> SPOKEN replacements, for the text sent to the TTS engine only."""
+    for written, spoken in pairs:
+        text = re.sub(r"(?<!\w)" + re.escape(written) + r"(?!\w)", lambda _: spoken, text)
+    return text
 
 
 def qwen_synthesizer(model_id, speaker, language, instruct):
@@ -45,7 +54,15 @@ def main(argv, make_synthesizer=qwen_synthesizer):
     ap.add_argument("--speaker", default=DEFAULT_SPEAKER)
     ap.add_argument("--language", default="English")
     ap.add_argument("--instruct", default=DEFAULT_INSTRUCT)
+    ap.add_argument("--say", action="append", default=[], metavar="WRITTEN=SPOKEN",
+                    help="say WRITTEN as SPOKEN (whole word, case-sensitive); SCRIPT.md is unchanged; repeatable")
     a = ap.parse_args(argv)
+
+    pairs = [tuple(v.split("=", 1)) if "=" in v else (v, "") for v in a.say]
+    bad = [v for v, (w, s) in zip(a.say, pairs) if not w or not s]
+    if bad:
+        print(f"--say needs WRITTEN=SPOKEN: {bad[0]}", file=sys.stderr)
+        return 1
 
     script = a.project_dir / "SCRIPT.md"
     if not script.exists():
@@ -67,7 +84,7 @@ def main(argv, make_synthesizer=qwen_synthesizer):
         for old in voice_in.glob(f"{nn}.*"):  # one file per line, or adopt_voice.py refuses the frame
             if old.suffix.lower() in EXTS:
                 old.unlink()
-        synthesize(lines[frame], voice_in / f"{nn}.wav")
+        synthesize(respell(lines[frame], pairs), voice_in / f"{nn}.wav")
         print(f"voiced frame {frame} -> voice-in/{nn}.wav", flush=True)
     return 0
 

@@ -97,6 +97,25 @@ class QwenVoiceTests(unittest.TestCase):
         self.assertIn("frame 3", err)
         self.assertEqual(self.fake.calls, [])
 
+    def test_say_respells_only_the_synthesized_text(self):
+        (self.p / "SCRIPT.md").write_text(SCRIPT.replace("The middle line.", "Two KBs here."))
+        code, _ = self.run_main("--frames", "1", "--say", "KBs=K-Bs")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.fake.calls, ["Two K-Bs here."])
+        self.assertIn("Two KBs here.", (self.p / "SCRIPT.md").read_text())
+
+    def test_say_is_whole_word_only(self):
+        (self.p / "SCRIPT.md").write_text(SCRIPT.replace("The middle line.", "Two KBs and a KB."))
+        self.assertEqual(self.run_main("--frames", "1", "--say", "KB=kay-bee")[0], 0)
+        self.assertEqual(self.fake.calls, ["Two KBs and a kay-bee."])
+
+    def test_say_without_equals_fails_before_loading_the_model(self):
+        for bad in ("bad", "=x", "x="):
+            code, err = self.run_main("--say", bad)
+            self.assertEqual(code, 1)
+            self.assertIn(f"--say needs WRITTEN=SPOKEN: {bad}", err)
+        self.assertEqual(self.fake.loads, 0)
+
     def test_missing_script(self):
         (self.p / "SCRIPT.md").unlink()
         code, err = self.run_main()

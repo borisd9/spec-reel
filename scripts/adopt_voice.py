@@ -2,6 +2,8 @@
 """Adopt the user's own narration files into a HyperFrames faceless-explainer project.
 
     python3 -I adopt_voice.py <project_dir>                 # voice-in/NN.<ext> -> assets/voice/NN.wav + meta
+    python3 -I adopt_voice.py <project_dir> --pause 1.0     # same, with 1.0 s of silence after every line but the last
+    python3 -I adopt_voice.py <project_dir> --check-speech  # lines whose transcript differs from SCRIPT.md (voice_heard.json)
     python3 -I adopt_voice.py <project_dir> --check         # every narrated frame has a voice, a WAV and words
     python3 -I adopt_voice.py <project_dir> --check-script  # SCRIPT.md words == user_script.txt words, line by line,
                                                             # the script and storyboard open with the title intro,
@@ -10,7 +12,9 @@
 Standard library only. ffmpeg, ffprobe and `npx hyperframes transcribe` are reached through
 three small functions that tests replace.
 """
+import difflib
 import json
+import math
 import re
 import subprocess
 import sys
@@ -18,6 +22,7 @@ import tempfile
 from pathlib import Path
 
 EXTS = (".wav", ".mp3", ".m4a", ".aiff")
+WHISPER_MODEL = "medium.en"
 # Same rules as parseScript / runSyncDurations in faceless-explainer's scripts/audio.mjs.
 SCRIPT_HEADING = re.compile(r"^#{2,3}\s+.*?\(frame\s+(\d+)\)", re.I)
 SCRIPT_TEXT = re.compile(r"^(?: {4,}|\t)(.+)$")
@@ -91,8 +96,9 @@ def words_of(text):
 
 # --- the three replaceable external calls -------------------------------------------------
 
-def to_wav(src, dst):
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-ar", "44100", "-ac", "1", str(dst)],
+def to_wav(src, dst, pad_s=0.0):
+    pad = ["-af", f"apad=pad_dur={pad_s}"] if pad_s > 0 else []
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-ar", "44100", "-ac", "1", *pad, str(dst)],
                    check=True, capture_output=True, text=True)
 
 
@@ -107,10 +113,62 @@ def transcribe(wav):
     wav = Path(wav).resolve()
     with tempfile.TemporaryDirectory(prefix="hf-trans-") as td:
         # wav sits at <project>/assets/voice/NN.wav
-        subprocess.run(["npx", "hyperframes", "transcribe", str(wav), "--model", "small.en", "--dir", td],
+        subprocess.run(["npx", "hyperframes", "transcribe", str(wav), "--model", WHISPER_MODEL, "--dir", td],
                        check=True, capture_output=True, text=True, cwd=wav.parents[2])
         arr = json.loads((Path(td) / "transcript.json").read_text())
     return [{"text": w.get("text", w.get("word", "")), "start": w["start"], "end": w["end"]} for w in arr]
+
+
+# --- script words on transcript timings ---------------------------------------------------
+
+def _norm(tok):
+    return re.sub(r"[^\w]", "", tok.lower().replace("'", ""))
+
+
+def _opcodes(script_text, heard):
+    a = [_norm(t) for t in script_text.split()]
+    b = [_norm(h["text"]) for h in heard]
+    return difflib.SequenceMatcher(a=a, b=b, autojunk=False).get_opcodes()
+
+
+def align_words(script_text, heard):
+    """The script's own tokens on the transcript's timings: [{text, start, end}], one per script token."""
+    toks = script_text.split()
+    out, last_end = [], None
+    for tag, i1, i2, j1, j2 in _opcodes(script_text, heard):
+        n, k = i2 - i1, j2 - j1
+        if tag == "insert":  # heard words the script does not have
+            continue
+        if tag == "delete":  # script words nobody said: zero-length, right after the previous word
+            at = last_end if last_end is not None else (heard[j1]["start"] if j1 < len(heard) else 0.0)
+            out += [{"text": t, "start": at, "end": at} for t in toks[i1:i2]]
+            continue
+        if n == k:
+            spans = [(h["start"], h["end"]) for h in heard[j1:j2]]
+        else:  # unequal replace: spread the heard span evenly over the script tokens
+            s, e = heard[j1]["start"], heard[j2 - 1]["end"]
+            spans = [(s + d * (e - s) / n, s + (d + 1) * (e - s) / n) for d in range(n)]
+        out += [{"text": t, "start": s, "end": e} for t, (s, e) in zip(toks[i1:i2], spans)]
+        last_end = out[-1]["end"]
+    return out
+
+
+def speech_diffs(script_text, heard):
+    """[(want, got)] where what was heard differs from the script. Digits vs number words are not a diff."""
+    toks = script_text.split()
+    diffs = []
+    for tag, i1, i2, j1, j2 in _opcodes(script_text, heard):
+        if tag == "equal":
+            continue
+        want, got = toks[i1:i2], [h["text"].strip() for h in heard[j1:j2]]
+        if any(side and all(_norm(t).isdigit() for t in side) for side in (want, got)):
+            continue
+        diffs.append((" ".join(want), " ".join(got)))
+    return diffs
+
+
+def diff_lines(frame, text, heard):
+    return [f'frame {frame}: heard "{got}" for "{want}"' for want, got in speech_diffs(text, heard)]
 
 
 # --- modes ---------------------------------------------------------------------------------
@@ -120,14 +178,15 @@ def fail(lines):
     return 1
 
 
-def adopt(p, to_wav, probe_duration, transcribe):
+def adopt(p, to_wav, probe_duration, transcribe, pause_s=0.0):
     script = p / "SCRIPT.md"
     if not script.exists():
         return fail([f"SCRIPT.md not found in {p}"])
     lines = parse_script(script.read_text())
     if not lines:
         return fail(["SCRIPT.md has no '(Frame N)' headings"])
-    problems, voices = [], []
+    last_frame = max(f for f, _ in lines)
+    problems, voices, heard_by_frame = [], [], {}
     (p / "assets/voice").mkdir(parents=True, exist_ok=True)
     for frame, text in lines:
         nn = f"{frame:02d}"
@@ -143,7 +202,7 @@ def adopt(p, to_wav, probe_duration, transcribe):
             continue
         dst = p / "assets/voice" / f"{nn}.wav"
         try:
-            to_wav(found[0], dst)
+            to_wav(found[0], dst, pad_s=pause_s if frame != last_frame else 0.0)
             duration = probe_duration(dst)
             words = transcribe(dst)
         except Exception as e:  # ffmpeg, ffprobe or transcribe failed on this file
@@ -152,9 +211,11 @@ def adopt(p, to_wav, probe_duration, transcribe):
         if not words:
             problems.append(f"frame {frame}: no words found in {found[0].name}")
             continue
+        heard_by_frame[str(frame)] = [{"text": w["text"], "start": round(w["start"], 3), "end": round(w["end"], 3)}
+                                      for w in words]
         voices.append({"frame": frame, "path": f"assets/voice/{nn}.wav", "duration_s": round(duration, 3),
                        "words": [{"id": f"w{i}", "text": w["text"], "start": round(w["start"], 3),
-                                  "end": round(w["end"], 3)} for i, w in enumerate(words)]})
+                                  "end": round(w["end"], 3)} for i, w in enumerate(align_words(text, words))]})
     if problems:
         return fail(problems)
     # Both files, one pass; an existing file keeps everything except `voices`.
@@ -165,7 +226,12 @@ def adopt(p, to_wav, probe_duration, transcribe):
         meta["voices"] = [{key: v["frame"] if key == "frame" else f"{v['frame']:02d}",
                            **{k: x for k, x in v.items() if k != "frame"}} for v in voices]
         f.write_text(json.dumps(meta, indent=2))
+    (p / "voice_heard.json").write_text(json.dumps(heard_by_frame, indent=2))
     print(f"adopted {len(voices)} voice file(s) -> audio_meta.json, audio_engine_meta.json")
+    diffs = [d for frame, text in lines for d in diff_lines(frame, text, heard_by_frame[str(frame)])]
+    if diffs:
+        print("\n".join(diffs))
+        print(f"run adopt_voice.py {p} --check-speech to list these again")
     return 0
 
 
@@ -216,17 +282,46 @@ def check_script(p):
     return fail(problems) if problems else 0
 
 
+def check_speech(p):
+    absent = [n for n in ("SCRIPT.md", "voice_heard.json") if not (p / n).exists()]
+    if absent:
+        return fail([f"{n} not found in {p}" for n in absent])
+    heard = json.loads((p / "voice_heard.json").read_text())
+    problems = []
+    for frame, text in parse_script((p / "SCRIPT.md").read_text()):
+        if str(frame) in heard:
+            problems += diff_lines(frame, text, heard[str(frame)])
+        else:
+            problems.append(f"frame {frame}: not voiced")
+    return fail(problems) if problems else 0
+
+
+USAGE = "usage: adopt_voice.py <project_dir> [--pause SECONDS | --check | --check-script | --check-speech]"
+
+
 def main(argv, to_wav=to_wav, probe_duration=probe_duration, transcribe=transcribe):
+    argv, pause_s, paused = list(argv), 0.0, "--pause" in argv
+    if paused:  # `--pause SECONDS`: take both tokens out before the mode/argument split
+        i = argv.index("--pause")
+        try:
+            pause_s = float(argv[i + 1])
+        except (IndexError, ValueError):
+            return fail([USAGE])
+        if not math.isfinite(pause_s) or pause_s < 0:
+            return fail([USAGE])
+        del argv[i:i + 2]
     args = [a for a in argv if not a.startswith("--")]
     modes = [a for a in argv if a.startswith("--")]
-    if len(args) != 1 or modes not in ([], ["--check"], ["--check-script"]):
-        return fail(["usage: adopt_voice.py <project_dir> [--check | --check-script]"])
+    if len(args) != 1 or modes not in ([], ["--check"], ["--check-script"], ["--check-speech"]) or (paused and modes):
+        return fail([USAGE])
     p = Path(args[0])
+    if modes == ["--check-speech"]:
+        return check_speech(p)
     if modes == ["--check"]:
         return check(p)
     if modes == ["--check-script"]:
         return check_script(p)
-    return adopt(p, to_wav, probe_duration, transcribe)
+    return adopt(p, to_wav, probe_duration, transcribe, pause_s)
 
 
 if __name__ == "__main__":
