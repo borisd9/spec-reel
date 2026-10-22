@@ -55,7 +55,7 @@ Replace `<this skill's directory>` with the real absolute path when writing the 
 Everything else in faceless-explainer runs as written, including Step 5's `sync-durations` and `fetch-sfx`.
 
 1. **Skip the "keep this skill fresh" update question**, because `init` already updated the skills. **At Step 0's sign-in status, relay it and continue offline**: this skill makes the narration and music is `none`, so no hosted provider is needed.
-2. **This skill's voicing replaces Step 3.1.** Never run faceless-explainer's `audio.mjs` voice generation. Do the voicing steps below at the same point: after the Step 3 plan approval, before Step 4.
+2. **This skill's voicing replaces Step 3.1.** Never run faceless-explainer's `audio.mjs` voice generation. Do the voicing steps below at the same point: after the Step 3 plan approval (in yolo mode, once the plan is written), before Step 4.
 3. **Voice check** (below) after voicing, again after Step 5's `fetch-sfx`, and after any re-voice.
 4. **Script lines map one-to-one onto frames, and Frame 1 is the title intro.** In Step 3, write one frame per line of `user_script.txt`, in the same order, with the same spoken words. Labels, `Time` and `Delivery` may change, except that Line 1 stays labeled `Intro`. Frame 1 is the intro scene:
 
@@ -67,16 +67,31 @@ Everything else in faceless-explainer runs as written, including Step 5's `sync-
 
    Its narrative asks for the title as the dominant on-screen text, nothing competing with it, and the intro line as the narration. This replaces faceless-explainer's opening-hook guidance for Frame 1; its hook strategy applies from Frame 2.
 
-   Each Demo line's frame names its demo file and builds around it, per `demo.md` § In the script and the scenes. This is faceless-explainer's user-supplied asset path (`public/<basename>` in `asset_candidates`), not a change to it. After the Step 3 plan approval and before any voicing, run the script check:
+   Every other frame after the intro gets a scene card, two kinds of lines in the frame's block. The frame workers receive them as written.
+   - `- scene_job:` is one of `why`, `change`, `proof` or `next`, the one job the scene does.
+   - For a `change` frame, `- before:` and `- after:` too: what was true, and what is true now.
+   - Demo frames (a frame whose `asset_candidates` names a `public/demo-*` file) need no `scene_job`.
+
+   ```markdown
+   ## Frame 3 — Retries
+   - scene_job: change
+   - before: "A failed upload had to be restarted by hand."
+   - after: "A failed upload retries on its own."
+   ```
+
+   The screen and the voice do two jobs. The screen shows the noun or the number; the voice carries the sentence. They never show the same sentence.
+
+   Each Demo line's frame names its demo file and builds around it, per `demo.md` § In the script and the scenes. This is faceless-explainer's user-supplied asset path (`public/<basename>` in `asset_candidates`), not a change to it. After the Step 3 plan approval (in yolo mode, once the plan is written) and before any voicing, run the script check:
 
    ```bash
    python3 -I <this skill's directory>/scripts/adopt_voice.py . --check-script
    ```
 
-   It also fails when `user_script.txt` does not open with `## Line 1 — Intro (Frame 1)`, when that line is longer than 20 words, when `STORYBOARD.md` Frame 1 has no `on_screen_title`, or when a `public/demo-*` file has no Demo line or no frame naming it. When it fails:
+   It also fails when `user_script.txt` does not open with `## Line 1 — Intro (Frame 1)`, when that line is longer than 20 words, when `STORYBOARD.md` Frame 1 has no `on_screen_title`, when a `public/demo-*` file has no Demo line or no frame naming it, or when a frame other than the intro and the Demo frames has no `scene_job` (or a `change` frame has no `before` and `after`). When it fails:
    - a missing or empty `on_screen_title` is fixed by writing the approved title into Frame 1, and the check runs again;
    - a demo file with no frame naming it is fixed by adding its `asset_candidates` line to its Demo frame; a missing Demo line re-opens gate 2;
    - a wording change the user asked for at the Step 3 plan review is applied to `user_script.txt` first, gate 2 is re-approved and its new SHA-256 recorded in `RUN.md`, `SCRIPT.md` is updated to match, and the check runs again;
+   - a missing `scene_job`, `before` or `after` is fixed by adding the line to that frame, taken from the approved digest, and the check runs again;
    - any other mismatch is fixed by rewriting `SCRIPT.md`'s spoken lines from `user_script.txt`, and the check runs again.
 5. **Step 6 change requests rebuild only the named frames**, one frame worker each. When a named frame's spoken text changed:
    1. Update that line in both `user_script.txt` and `SCRIPT.md`.
@@ -88,6 +103,7 @@ Everything else in faceless-explainer runs as written, including Step 5's `sync-
    Every voice generation in a run, including re-voicing, goes through the run's chosen voice source. A run never mixes the two sources.
 6. **Claim check before the preview review.** faceless-explainer's checks look at structure, not at whether the words on screen are true, and its frame workers invent visuals. So after Step 6's checks pass and before the preview question, read every built frame (`compositions/frames/NN-*.html`) and list the text a viewer sees, including text that scripts type or reveal.
    - **Must be grounded:** names, numbers, dates, statuses, capabilities and quotes. Each must appear in the approved digest (`capture/extracted/visible-text.txt`) or in `sources/`. Re-cased, shortened or split across elements is fine; invented is not.
+   - **Tense must match status:** a line about a `[planned]` or `[in progress]` point must read as future or ongoing ("will", "coming"), never as done. A "shipped" look (a done check mark, "now live", "released") on such a point is ungrounded.
    - **Free to invent:** framing and connective text that asserts nothing, such as "Here's what changes" or "Next up".
    - **Fix an ungrounded line** with the cheapest edit to that frame's HTML, using the digest's own wording, then run Step 6's checks again.
 
@@ -164,7 +180,22 @@ Each worker's dispatch context lists that frame's word timings from `audio_meta.
    ```
 
    Record both numbers and their difference in `RUN.md`. A difference above 2 seconds is reported to the user before the run is marked `done`.
-2. Cover frame. Chat apps and most players show a video's first frame as its thumbnail, and a raw render starts on a fade. Make the first frame the intro title instead.
+2. Video QC. Both commands run from the project folder.
+   1. Normalize the loudness. It rewrites `renders/video.mp4` through a temp file, copies the video stream and encodes the audio to -16 LUFS:
+
+      ```bash
+      python3 -I <this skill's directory>/scripts/qc_video.py . --normalize
+      ```
+
+   2. Check the result against the run's target length: seconds (`75`), or a range as answered (`60-90`, the default; yolo: `75`):
+
+      ```bash
+      python3 -I <this skill's directory>/scripts/qc_video.py . --check <target seconds or range>
+      ```
+
+      It fails, listing each problem, when the video is not H.264 `yuv420p` at 1920x1080, has no audio stream, has a black span of 0.5 seconds or more, or has a length more than 12% off the target.
+   3. Record `qc: pass` or `qc: <problems>` under `## Render` in `RUN.md`. A failure is reported to the user before the run is marked `done`; it does not stop the run.
+3. Cover frame. Chat apps and most players show a video's first frame as its thumbnail, and a raw render starts on a fade. Make the first frame the intro title instead.
    1. Pick a moment when the title is fully on screen: about 60% through Frame 1's voice (`duration_s` of frame 1 in `audio_meta.json`).
    2. Pull that frame:
 
@@ -183,9 +214,9 @@ Each worker's dispatch context lists that frame's word timings from `audio_meta.
       ```
 
    5. Read the MP4 length again with `ffprobe`; it must match the length recorded in step 1. Record `cover: <seconds>` under `## Render` in `RUN.md`.
-3. Share caption. Write `renders/share-copy.txt`: one to three sentences to post with the video in a team channel, for the run's audience and intent. Every claim in it comes from the approved digest; it names no customer or person and carries no personal data, link to an internal page or credential. Plain words, no "excited to share".
-4. Set `RUN.md` stage to `done`.
-5. Report: the MP4 path, its length, the sync difference, the cover time, the caption text, and the frame ids, so the user can ask for a single-scene change or a caption edit.
+4. Share caption. Write `renders/share-copy.txt`: one to three sentences to post with the video in a team channel, for the run's audience and intent. Every claim in it comes from the approved digest; it names no customer or person and carries no personal data, link to an internal page or credential. Plain words, no "excited to share". Check it against `references/style.md` and fix what fails.
+5. Set `RUN.md` stage to `done`.
+6. Report: the MP4 path, its length, the sync difference, the QC result, the cover time, the caption text, and the frame ids, so the user can ask for a single-scene change or a caption edit.
 
 ## Step 6 change requests
 

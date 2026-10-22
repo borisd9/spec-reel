@@ -7,7 +7,8 @@
     python3 -I adopt_voice.py <project_dir> --check         # every narrated frame has a voice, a WAV and words
     python3 -I adopt_voice.py <project_dir> --check-script  # SCRIPT.md words == user_script.txt words, line by line,
                                                             # the script and storyboard open with the title intro,
-                                                            # and every public/demo-* file has its Demo line and frame
+                                                            # and every public/demo-* file has its Demo line and frame,
+                                                            # and every other frame has a scene_job
 
 Standard library only. ffmpeg, ffprobe and `npx hyperframes transcribe` are reached through
 three small functions that tests replace.
@@ -33,6 +34,8 @@ TITLE_RE = re.compile(r"^\s*[-*]\s+on_screen_title\s*:\s*(.+?)\s*$", re.I)
 MAX_INTRO_WORDS = 20
 DEMO_HEADING = re.compile(r"^#{2,3}\s+line\s+\d+\s+\W+\s*demo\s*\(frame\s+\d+\)", re.I | re.M)
 ASSETS_RE = re.compile(r"^\s*[-*]\s+asset_candidates\s*:\s*(.+?)\s*$", re.I)
+SCENE_JOBS = ("why", "change", "proof", "next")
+CARD_RE = re.compile(r"^\s*[-*]\s+(scene_job|before|after)\s*:\s*(.+?)\s*$", re.I)
 
 
 def parse_script(md):
@@ -88,6 +91,22 @@ def named_assets(storyboard_md):
         if m:
             names.update(Path(re.split(r"\s+[—–-]\s+", seg)[0].strip()).name for seg in m.group(1).split(";"))
     return names
+
+
+def scene_cards(storyboard_md):
+    """STORYBOARD.md -> {frame: {"scene_job"|"before"|"after": value, "demo": True when it names a public/demo-* file}}."""
+    cards, cur = {}, None
+    for line in storyboard_md.splitlines():
+        h = FRAME_RE.match(line)
+        if h:
+            cur = cards.setdefault(int(h.group(1)), {})
+            continue
+        c, a = CARD_RE.match(line), ASSETS_RE.match(line)
+        if cur is not None and c and c.group(2).strip("\"'").strip():
+            cur[c.group(1).lower()] = c.group(2).strip("\"'").strip().lower()
+        if cur is not None and a and re.search(r"public/demo-", a.group(1)):
+            cur["demo"] = True
+    return cards
 
 
 def words_of(text):
@@ -274,6 +293,13 @@ def check_script(p):
         problems.append(f"user_script.txt has {demo_lines} Demo line(s) for {len(demos)} demo file(s)")
     problems += [f"{d}: no STORYBOARD.md frame names public/{d} in asset_candidates"
                  for d in demos if d not in named_assets(storyboard)]
+    for frame, card in sorted(scene_cards(storyboard).items()):
+        if frame == 1 or card.get("demo"):  # the intro and the Demo frames have no scene_job
+            continue
+        if card.get("scene_job") not in SCENE_JOBS:
+            problems.append(f"frame {frame}: STORYBOARD.md has no scene_job")
+        elif card["scene_job"] == "change" and not (card.get("before") and card.get("after")):
+            problems.append(f"frame {frame}: scene_job change needs before and after")
     if len(actual) != len(approved):
         problems.append(f"SCRIPT.md has {len(actual)} lines, user_script.txt has {len(approved)} lines")
     for (_, got), (frame, want) in zip(actual, approved):

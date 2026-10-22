@@ -8,7 +8,29 @@ You give it one or more links or files. It reads them, writes a digest of why ea
 
 Every video opens with an intro scene: the approved title on screen, narrated by one short sentence on what the video is about. When the feature can be shown, a demo scene shows it: a mock or a screen recording found in your sources or given by you. You can skip the demo.
 
-Stages: sources, digest, title and demo (you approve), script (you approve), voicing, frame plan (you approve), sketches (you approve), claim check, preview (you approve), render, cover frame and caption. With `--yolo`, the skill makes every approval itself (see [First run](#first-run)).
+Stages: sources, digest, title and demo (you approve), script (you approve), voicing, frame plan (you approve), sketches (you approve), claim check, preview (you approve), render, video check, cover frame and caption. With `--yolo`, the skill makes every approval itself (see [First run](#first-run)).
+
+```mermaid
+flowchart TD
+  sources[Read your links and files] --> digest[Digest, title and demo choice]
+  digest --> gate1{You approve?}
+  gate1 -- edits --> digest
+  gate1 -- yes --> script[Narration script]
+  script --> gate2{You approve?}
+  gate2 -- edits --> script
+  gate2 -- yes --> voice[Voice it on your Mac]
+  voice --> scenes[HyperFrames builds the scenes]
+  scenes --> claims[Claim check: on-screen facts vs sources]
+  claims --> preview{You approve the preview?}
+  preview -- changes --> scenes
+  preview -- yes --> render[Render the MP4]
+  render --> qc[Video check: loudness, format, length]
+  qc --> cover[Title as cover frame]
+  cover --> caption[Share caption]
+  caption --> report[Report]
+```
+
+With `--yolo`, every "You approve?" step is decided by the skill and listed in the report.
 
 Every run has its own folder with a `RUN.md` that records the stage and each approval, so an interrupted run can be resumed.
 
@@ -98,6 +120,8 @@ It uses the defaults (a team update, about 75 seconds, the configured voice), de
 
 Without `--yolo`, the skill asks, in one batch: the links or files, the audience and intent, the target length (default 60-90 seconds) and the voice source. Then approve the digest, approve the script, and review the frame plan, the sketch board and the preview. Before the preview, the skill checks that every name, number and capability shown on screen comes from your sources.
 
+After the render, `scripts/qc_video.py` normalizes the loudness to -16 LUFS and checks the MP4's format, audio, black spans and length.
+
 Inside the run folder, `renders/` then holds:
 
 - `video.mp4`, whose first frame is the intro title, so chat apps show it as the thumbnail;
@@ -117,6 +141,8 @@ Every pull request runs `.github/workflows/checks.yml`: these tests on Linux and
 ## Credits
 
 The cover frame, the share caption and the on-screen claim check are adapted from [brag](https://github.com/latent-spaces/brag) by Shunit Haviv Hakimi (MIT).
+
+Change-line, style and scene-card rules adapted from [marketingskills](https://github.com/coreyhaines31/marketingskills) (MIT, Corey Haines) and [story-skills](https://github.com/danjdewhurst/story-skills) (MIT).
 
 ## License
 
