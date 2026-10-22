@@ -8,29 +8,21 @@ You give it one or more links or files. It reads them, writes a digest of why ea
 
 Every video opens with an intro scene: the approved title on screen, narrated by one short sentence on what the video is about. When the feature can be shown, a demo scene shows it: a mock or a screen recording found in your sources or given by you. You can skip the demo.
 
-Stages: sources, digest, title and demo (you approve), script (you approve), voicing, frame plan (you approve), sketches (you approve), claim check, preview (you approve), render, video check, cover frame and caption. With `--yolo`, the skill makes every approval itself (see [First run](#first-run)).
+How a run goes:
 
-```mermaid
-flowchart TD
-  sources[Read your links and files] --> digest[Digest, title and demo choice]
-  digest --> gate1{You approve?}
-  gate1 -- edits --> digest
-  gate1 -- yes --> script[Narration script]
-  script --> gate2{You approve?}
-  gate2 -- edits --> script
-  gate2 -- yes --> voice[Voice it on your Mac]
-  voice --> scenes[HyperFrames builds the scenes]
-  scenes --> claims[Claim check: on-screen facts vs sources]
-  claims --> preview{You approve the preview?}
-  preview -- changes --> scenes
-  preview -- yes --> render[Render the MP4]
-  render --> qc[Video check: loudness, format, length]
-  qc --> cover[Title as cover frame]
-  cover --> caption[Share caption]
-  caption --> report[Report]
-```
+1. Read your links and files.
+2. Write a digest, a title and a demo choice. You approve or edit.
+3. Write the narration script. You approve or edit.
+4. HyperFrames plans the scenes. You review the frame plan.
+5. Voice the script on your Mac.
+6. HyperFrames sketches and builds the scenes. You review the sketches.
+7. Check that every fact on screen comes from your sources.
+8. Show the preview. You approve or ask for changes.
+9. Render the MP4, then check its loudness, format and length.
+10. Put the title on the first frame as the cover, and write a share caption.
+11. Report what was made.
 
-With `--yolo`, every "You approve?" step is decided by the skill and listed in the report.
+With `--yolo`, the skill makes every approval itself and lists those decisions in the report (see [First run](#first-run)).
 
 Every run has its own folder with a `RUN.md` that records the stage and each approval, so an interrupted run can be resumed.
 
