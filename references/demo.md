@@ -40,7 +40,7 @@ ffmpeg -y -loglevel error -i demo-in/<name> [-ss <start>] [-to <end>] -an \
   -c:v libx264 -pix_fmt yuv420p -vf "scale='min(1920,iw)':-2" -movflags +faststart public/demo-NN.mp4
 ```
 
-For an HTML mock, take a PNG screenshot of the named state with the host's browser tool (for example the `dev-browser` CLI) at device scale factor 2, cropped to the mock's main element, save it to `demo-in/`, then prepare it as an image. If a sign-in overlay covers it (Stash shows "Sign in to Stash"), dismiss it with its `Skip` button first; never sign in.
+For an HTML mock, take a PNG screenshot of the named state with the host's browser tool (for example the `dev-browser` CLI) at device scale factor 2, cropped to the mock's main element, save it to `demo-in/`, then prepare it as an image. If a sign-in overlay covers it, dismiss it with its skip or close button first; never sign in.
 
 Record in `RUN.md` under `## Demo`: each `public/demo-NN.<ext>`, its original link or path, and its length for a recording (`ffprobe -v error -show_entries format=duration -of csv=p=0 <file>`).
 
