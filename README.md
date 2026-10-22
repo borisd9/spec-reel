@@ -98,6 +98,8 @@ It uses the defaults (a team update, about 75 seconds, the configured voice), de
 
 Without `--yolo`, the skill asks, in one batch: the links or files, the audience and intent, the target length (default 60-90 seconds) and the voice source. Then approve the digest, approve the script, and review the frame plan, the sketch board and the preview. Before the preview, the skill checks that every name, number and capability shown on screen comes from your sources.
 
+After the render, `scripts/qc_video.py` normalizes the loudness to -16 LUFS and checks the MP4's format, audio, black spans and length.
+
 Inside the run folder, `renders/` then holds:
 
 - `video.mp4`, whose first frame is the intro title, so chat apps show it as the thumbnail;
@@ -117,6 +119,8 @@ Every pull request runs `.github/workflows/checks.yml`: these tests on Linux and
 ## Credits
 
 The cover frame, the share caption and the on-screen claim check are adapted from [brag](https://github.com/latent-spaces/brag) by Shunit Haviv Hakimi (MIT).
+
+Change-line, style and scene-card rules adapted from [marketingskills](https://github.com/coreyhaines31/marketingskills) (MIT, Corey Haines) and [story-skills](https://github.com/danjdewhurst/story-skills) (MIT).
 
 ## License
 

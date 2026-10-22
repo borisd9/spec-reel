@@ -351,7 +351,11 @@ INTRO_STORYBOARD = """## Frame 1 — Intro
 - on_screen_title: "The New Upload Flow"
 - voiceover: "This is a short tour of the new upload flow."
 ## Frame 2 — Middle
+- scene_job: change
+- before: "Uploads fail silently."
+- after: "Uploads show an error."
 ## Frame 3 — End
+- scene_job: next
 """
 
 
@@ -419,6 +423,30 @@ class CheckScriptTests(Base):
         self.assertNotEqual(code, 0)
         self.assertIn("0 Demo line(s) for 1 demo file(s)", err)
         self.assertIn("demo-01.mp4: no STORYBOARD.md frame", err)
+
+    def test_frame_without_scene_job_is_named(self):
+        code, err = self.check(INTRO_SCRIPT, INTRO_STORYBOARD.replace("- scene_job: next\n", ""))
+        self.assertNotEqual(code, 0)
+        self.assertIn("frame 3: STORYBOARD.md has no scene_job", err)
+        self.assertNotIn("frame 2", err)
+
+    def test_unknown_scene_job_counts_as_missing(self):
+        code, err = self.check(INTRO_SCRIPT, INTRO_STORYBOARD.replace("scene_job: next", "scene_job: wow"))
+        self.assertNotEqual(code, 0)
+        self.assertIn("frame 3: STORYBOARD.md has no scene_job", err)
+
+    def test_change_needs_before_and_after(self):
+        code, err = self.check(INTRO_SCRIPT, INTRO_STORYBOARD.replace('- after: "Uploads show an error."\n', ""))
+        self.assertNotEqual(code, 0)
+        self.assertIn("frame 2: scene_job change needs before and after", err)
+
+    def test_intro_and_demo_frames_need_no_scene_job(self):
+        script = INTRO_SCRIPT.replace("Middle (Frame 2)", "Demo (Frame 2)")
+        storyboard = INTRO_STORYBOARD.replace(
+            "## Frame 2 — Middle\n- scene_job: change\n- before: \"Uploads fail silently.\"\n- after: \"Uploads show an error.\"",
+            "## Frame 2 — Demo\n- asset_candidates: public/demo-01.mp4 — [video] the upload")
+        code, err = self.with_demo(script, storyboard)
+        self.assertEqual(code, 0, err)
 
     def test_title_on_another_frame_does_not_count(self):
         moved = INTRO_STORYBOARD.replace('- on_screen_title: "The New Upload Flow"\n', "") \
