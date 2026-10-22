@@ -84,7 +84,15 @@ In Claude Code:
 /spec-reel https://example.com/plan ~/plans/feature-spec.md
 ```
 
-The skill asks, in one batch: the links or files, the audience and intent, the target length (default 60-90 seconds) and the voice source. Then approve the digest, approve the script, and review the frame plan, the sketch board and the preview. Before the preview, the skill checks that every name, number and capability shown on screen comes from your sources.
+For a run with no questions at all, add `--yolo`:
+
+```text
+/spec-reel --yolo https://example.com/plan ~/plans/feature-spec.md
+```
+
+It uses the defaults (a team update, about 75 seconds, the configured voice), decides every review itself, renders the MP4, and ends with a list of everything it decided without you. It never posts or shares the video. Claude Code may still ask permission to run commands (`npx`, `ffmpeg`, `uv`, `curl`, `gh`) unless your permission mode allows them.
+
+Without `--yolo`, the skill asks, in one batch: the links or files, the audience and intent, the target length (default 60-90 seconds) and the voice source. Then approve the digest, approve the script, and review the frame plan, the sketch board and the preview. Before the preview, the skill checks that every name, number and capability shown on screen comes from your sources.
 
 Inside the run folder, `renders/` then holds:
 

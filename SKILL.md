@@ -1,7 +1,7 @@
 ---
 name: spec-reel
 description: "Turn links to plans and specs into a short narrated explainer video. Asks for the sources, audience and length, reads them into an approved digest, picks a demo mock or recording when one exists, writes an approved timestamped script with a title intro, voices it locally with Qwen3-TTS (or the user's own TTS), then has HyperFrames faceless-explainer build synced scenes and render an MP4. Use for requests like 'make a video explaining this plan', 'turn these specs into a narrated update video', 'short video of what this feature changes', 'explainer video from these docs for the team'. For a single document with no review gates or own-voice option, faceless-explainer alone is enough."
-argument-hint: links or paths to plans and specs
+argument-hint: "[--yolo] links or paths to plans and specs"
 ---
 
 # Spec Reel
@@ -13,6 +13,8 @@ Stages: sources, digest, title and demo (gate 1), script (gate 2), frame plan, s
 Do not invoke the `hyperframes` skill through the Skill tool (it may be disabled for model invocation). Read the installed faceless-explainer `SKILL.md` directly: `~/.claude/skills/faceless-explainer/SKILL.md`.
 
 `<this skill's directory>` below means the folder that holds this `SKILL.md`.
+
+**Yolo mode.** When the user explicitly asks for it (`--yolo`, "yolo", "no questions"), read `references/yolo.md` first: it replaces every question and gate in this file with a recorded decision, and the run goes from sources to a rendered MP4 with no human interaction. It never posts or shares anything. Without that request, every gate below waits for the user.
 
 ## Setup
 
@@ -66,6 +68,7 @@ stage: sources            # sources | digest | script | faceless | done
 - length: ...
 - voice source: qwen (speaker) | own   (own: whether a tts_command was used, never its text)
 - pause: <slide_pause_s>s   captions: off | on
+- mode: interactive | yolo
 
 ## Sources
 - sources/01-<slug>.md  <original link>
@@ -131,7 +134,7 @@ Wait for approval or edits; loop until approved. Record the approval time and SH
 
 Set `stage: faceless`. Everything from here is in `references/handoff.md`; read it now. In short:
 
-1. Write `BRIEF.md` from its template, with `vo_mode: verbatim` and the delta line in `## Notes`.
+1. Write `BRIEF.md` from its template, with `vo_mode: verbatim` and the delta line in `## Notes` (`storyboard: no` and the yolo note in yolo mode).
 2. Follow the installed faceless-explainer `SKILL.md` Steps 0 to 6 with the six deltas:
    - The update question is skipped; at Step 0 the sign-in status is relayed and the run continues offline, since this skill makes the narration.
    - Step 3 keeps `user_script.txt`'s lines one-to-one as frames, and Frame 1 is the intro: the approved title on screen (`on_screen_title`) with the intro line as its voiceover. Each Demo frame names its `public/demo-NN` file in `asset_candidates` and uses it as the focal element. After the plan approval run the script check (`adopt_voice.py . --check-script`) before any voicing.
