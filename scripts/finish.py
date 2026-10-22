@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Everything after a change, in one command. Stops at the first failing step and names it.
+"""Everything after a change, in one command. Stops at the first failing step and names it; a video QC failure
+is recorded instead, so the cover and RUN.md still follow, and the exit code is non-zero.
 
     python3 -I finish.py <project_dir> --review    # seconds: adopt, voice check, build, lint, layout check, stills
     python3 -I finish.py <project_dir> --final     # adopt, check, build, lint, render, loudness, QC, cover, RUN.md
@@ -100,7 +101,7 @@ class Finish:
     def __init__(self, p, runner, probe, pause_s, target):
         self.p, self.run, self.probe, self.pause_s, self.target = p, runner, probe, pause_s, target
         self.old_state = read_state(p)
-        self.scenes, self.state = None, None
+        self.scenes, self.state, self.qc = None, None, "pass"
 
     def cmd(self, *argv):
         """A step that runs one command in the project folder; a non-zero exit fails it."""
@@ -153,6 +154,12 @@ class Finish:
         shutil.copy(self.p / "renders/video.raw.mp4", self.p / "renders/video.mp4")
         return self.py("qc_video.py", "--normalize")()
 
+    def video_qc(self):
+        """Records, never stops: a video off its target length is still a video, so the cover and RUN.md follow."""
+        if self.py("qc_video.py", "--check", self.target)():
+            self.qc = "fail (qc_video.py listed the problems above)"
+        return None
+
     def cover(self):
         """The intro title on frame 0 (handoff.md: a moment about 60% through frame 1's voice)."""
         video, jpg, out = (self.p / "renders" / n for n in ("video.mp4", "cover.jpg", "video.cover.mp4"))
@@ -184,7 +191,7 @@ class Finish:
         with (self.p / "RUN.md").open("a") as f:
             f.write(f"\n## Final render {time.strftime('%Y-%m-%d %H:%M')}\n"
                     f"- sync: voice total {voice:.3f} s, MP4 {mp4:.3f} s, difference {diff:.3f} s{note}\n"
-                    f"- qc: pass\n- cover: {self.cover_s} s\n- video: renders/video.mp4\n")
+                    f"- qc: {self.qc}\n- cover: {self.cover_s} s\n- video: renders/video.mp4\n")
         write_state(self.p, self.state)
         print(f"video: {self.p / 'renders/video.mp4'}  ({mp4:.1f} s, sync difference {diff:.3f} s)")
         return None
@@ -200,7 +207,7 @@ class Finish:
             ("load scenes", self.load),
             ("render", self.hf("render", ".", "-o", "renders/video.raw.mp4")),
             ("loudness", self.normalize),
-            ("video qc", self.py("qc_video.py", "--check", self.target)),
+            ("video qc", self.video_qc),
             ("cover", self.cover),
             ("caption", self.caption),
             ("RUN.md", self.record),
@@ -253,6 +260,9 @@ def main(argv, runner=run_command, probe=probe_length):
             print(f"finish: step '{name}' failed: {error}", file=sys.stderr)
             return 1
     print(f"finish {modes[0][2:]}: done in {time.monotonic() - total:.1f} s")
+    if f.qc != "pass":
+        print("finish: the video is made, but video qc failed; RUN.md records it", file=sys.stderr)
+        return 1
     return 0
 
 

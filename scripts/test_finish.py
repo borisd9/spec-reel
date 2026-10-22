@@ -151,6 +151,16 @@ class FinishTests(unittest.TestCase):
         self.assertEqual(self.run_finish("--final")[0], 0)
         self.assertEqual((self.p / "renders/share-copy.txt").read_text(), "Ticket T-2 lands next week.")
 
+    def test_a_qc_failure_is_recorded_and_the_cover_still_goes_on(self):
+        code, _, err, fake = self.run_finish("--final", fake=Fake(fail="--check 60-90"))
+        self.assertEqual(code, 1)
+        self.assertIn("video qc failed", err)
+        self.assertTrue(any(c.startswith("ffmpeg") for c in fake.cmds))
+        self.assertTrue((self.p / "renders/video.mp4").exists())
+        run_md = (self.p / "RUN.md").read_text()
+        self.assertIn("- qc: fail", run_md)
+        self.assertIn("- cover: 6.0 s", run_md)
+
     def test_final_stops_before_rendering_when_the_build_fails(self):
         code, _, err, fake = self.run_finish("--final", fake=Fake(fail="build_index.py"))
         self.assertEqual(code, 1)

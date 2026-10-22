@@ -144,7 +144,9 @@ Set `stage: scenes`. Everything from here is in `references/handoff.md`; read it
 3. Build one scene per frame from `assets/scene.template.html` (the explainer route: one concrete example, a diagram that grows, the voice as the clock). Cue reveals on word text, `at("feed")`. No CSS filters. Music is `none`; captions follow the config `captions`.
 4. Before the review, the claim check: every name, number, date, status or capability shown on screen must come from the approved digest or the sources, and its tense must match the point's status tag; ungrounded lines are reworded in the digest's terms.
 5. **Preview.** `scripts/finish.py . --review` voice-checks, builds, and looks at the scenes that changed: a layout and contrast check plus a still of each. Show the stills; do not render yet. A change request rebuilds the named scenes (plus any whose length changes), runs `--review` again and shows their stills. The one full render, `scripts/finish.py . --final`, runs after the user approves, or once at the end in yolo mode. A change that brings a new source follows `references/handoff.md` § Change requests.
-6. After the render `--final` has made the MP4, normalized its loudness, checked its format, black spans and length, put the intro title on frame 0 as the cover, and written the sync, QC and cover lines to `RUN.md`. Then write `renders/share-copy.txt`, set `stage: done`, and report the MP4 path, its length, the sync difference, the QC result, the cover time, the caption and the frame ids.
+6. After the render `--final` has made the MP4, normalized its loudness, checked its format, black spans and length, put the intro title on frame 0 as the cover, and written the sync, QC and cover lines to `RUN.md`. Then write `renders/share-copy.txt`, set `stage: done`, and report the MP4 path, its length, the sync difference, the QC result, the cover time, the caption and the frame ids. A QC failure does not stop `--final`: it still adds the cover and the `RUN.md` lines, then exits non-zero. Ask the user what to do about it (yolo: list it in the report).
+
+**When a `finish.py` step fails** and the cause is in the run's own files, fix it and run the same command again, without asking: a cue on a word the line no longer says (cue on the word it says now), overflowing or low-contrast text, a CSS filter or an `onUpdate` callback in a scene, a `{{key}}` missing from `facts.json` whose value is in the approved digest. At most three tries per failure. A fix never changes the spoken text and never adds a fact the digest lacks: those go to the user (yolo: decide and list them in the report).
 
 ## Stop conditions
 
@@ -153,4 +155,4 @@ Stop and tell the user, without improvising, when:
 - a file the skill needs is missing under `~/.claude/skills/hyperframes/` (name it) or `npx hyperframes check --help` fails;
 - a step would need the `hyperframes` skill through the Skill tool;
 - a voice check fails and the user declines to switch voice source;
-- a `finish.py` step fails and the cause is not in the run's own files (a scene, the script, the voice): say which step.
+- a `finish.py` step still fails after three fixes, or its cause is not in the run's own files (a scene, the script, the voice): say which step and show the error.
