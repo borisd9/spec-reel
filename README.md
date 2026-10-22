@@ -1,5 +1,7 @@
 # Spec Reel
 
+<img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/586ad0a4-15ee-4b85-a283-3bf0f9c668e2" />
+
 A Claude Code skill that turns links to plans and specs into a short narrated explainer video.
 
 You give it one or more links or files. It reads them, writes a digest of why each plan exists, what it changes and what comes next, and writes a timestamped narration script. You approve both. It voices the script on your Mac with [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) through [MLX-Audio](https://github.com/Blaizzy/mlx-audio), or takes audio you make with any text-to-speech tool you choose. Then it hands scene building to the HyperFrames `faceless-explainer` workflow, which builds scenes synced to the narration and renders an MP4.
