@@ -14,7 +14,7 @@ Write it into the run folder right after `npx hyperframes init` (the run folder 
 ---
 workflow: faceless-explainer
 flow: automation
-storyboard: yes
+storyboard: yes        # no in yolo mode
 message: "<one sentence from the run answers: the one thing the video must say>"
 audience: "<from the run answers>"
 destination: desktop
@@ -43,9 +43,10 @@ video is about), then why it exists, what it changes, what comes next. The appro
 - faceless-explainer deltas in force: skip the update question and continue offline at Step 0; this skill's voicing replaces Step 3.1; voice check after voicing, after fetch-sfx and after any re-voice; script lines one-to-one with frames, Frame 1 the title intro, each demo file on its Demo frame; Step 6 rebuilds named frames only; claim check before the preview review. Full text: <this skill's directory>/references/handoff.md.
 - music: none (the storyboard sets `music: none`). captions: <config captions>.
 - Voice: <"Qwen3-TTS · <config qwen_speaker>" or "the user's own engine">, voiced by this skill.
+- (yolo mode only) mode: yolo. Ask nothing; at Step 6 skip the render-or-changes question and the preview, and render once the checks and the claim check pass.
 ```
 
-Replace `<this skill's directory>` with the real absolute path when writing the file. `## Assets` lists each prepared `public/demo-NN` file (an image drops the `[video]` tag); leave the section out when the demo was skipped. `storyboard: yes` with `flow: automation` is the collaborative mode: the user reviews the frame plan, the sketch board and the preview.
+Replace `<this skill's directory>` with the real absolute path when writing the file. `## Assets` lists each prepared `public/demo-NN` file (an image drops the `[video]` tag); leave the section out when the demo was skipped. `storyboard: yes` with `flow: automation` is the collaborative mode: the user reviews the frame plan, the sketch board and the preview. In yolo mode (`references/yolo.md`) write `storyboard: no`, which makes faceless-explainer autonomous: no plan question and no sketch board. Autonomous mode still keeps one question before the render; yolo skips that too, and the yolo note in `## Notes` says so. The comment after `storyboard:` is not written into the file.
 
 `user_script.txt` already sits at the project root, where faceless-explainer Step 1 saves a user script. `capture/extracted/visible-text.txt` (the approved digest) and `tokens.json` already exist; Step 1 checks they exist and does not rewrite them.
 
