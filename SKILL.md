@@ -6,7 +6,7 @@ argument-hint: links or paths to plans and specs
 
 # Spec Reel
 
-Links or files of plans and specs in, a narrated MP4 out. This skill owns the sources, the digest, the script and the review gates. It hands scene building and rendering to the installed `faceless-explainer` skill, with five small deltas.
+Links or files of plans and specs in, a narrated MP4 out. This skill owns the sources, the digest, the script and the review gates. It hands scene building and rendering to the installed `faceless-explainer` skill, with six small deltas.
 
 Stages: sources, digest, title and demo (gate 1), script (gate 2), frame plan, sketches, preview, render. The user approves at each gate; nothing is voiced or built before gate 2.
 
@@ -53,7 +53,7 @@ npx hyperframes init "<folder>" --non-interactive --example=blank --skill=facele
 `init` refuses a non-empty folder, so write nothing into it before this command finishes. Then write `RUN.md`:
 
 ```markdown
-faceless-explainer deltas in force: skip the update question and continue offline at Step 0; this skill's voicing replaces Step 3.1; voice check after voicing, after fetch-sfx and after any re-voice; script lines one-to-one with frames, Frame 1 the title intro, each demo file on its Demo frame; Step 6 rebuilds named frames only. Full text: <this skill's directory>/references/handoff.md.
+faceless-explainer deltas in force: skip the update question and continue offline at Step 0; this skill's voicing replaces Step 3.1; voice check after voicing, after fetch-sfx and after any re-voice; script lines one-to-one with frames, Frame 1 the title intro, each demo file on its Demo frame; Step 6 rebuilds named frames only; claim check before the preview review. Full text: <this skill's directory>/references/handoff.md.
 
 # Run <folder name>
 
@@ -79,6 +79,8 @@ stage: sources            # sources | digest | script | faceless | done
 
 ## Render
 - voice total: <s>  storyboard padding: <s>  MP4: <s>  difference: <s>
+- claim check: <n> lines, fixed <frame ids | none>
+- cover: <s>
 ```
 
 Replace `<this skill's directory>` in the first line with the real path. Update `stage` as each stage starts. Compute hashes with `shasum -a 256 <file>`.
@@ -130,14 +132,15 @@ Wait for approval or edits; loop until approved. Record the approval time and SH
 Set `stage: faceless`. Everything from here is in `references/handoff.md`; read it now. In short:
 
 1. Write `BRIEF.md` from its template, with `vo_mode: verbatim` and the delta line in `## Notes`.
-2. Follow the installed faceless-explainer `SKILL.md` Steps 0 to 6 with the five deltas:
+2. Follow the installed faceless-explainer `SKILL.md` Steps 0 to 6 with the six deltas:
    - The update question is skipped; at Step 0 the sign-in status is relayed and the run continues offline, since this skill makes the narration.
    - Step 3 keeps `user_script.txt`'s lines one-to-one as frames, and Frame 1 is the intro: the approved title on screen (`on_screen_title`) with the intro line as its voiceover. Each Demo frame names its `public/demo-NN` file in `asset_candidates` and uses it as the focal element. After the plan approval run the script check (`adopt_voice.py . --check-script`) before any voicing.
    - Voice: this skill replaces Step 3.1. Qwen3-TTS (`scripts/qwen_voice.py` through `uv run`) or the user's own engine writes one file per line into `voice-in/`, then `adopt_voice.py . --pause <slide_pause_s>` adds word timings and the pause. The speech check (`adopt_voice.py . --check-speech`) lists lines heard differently from the script, with up to two retakes. A run never mixes the two.
    - Voice check (`adopt_voice.py . --check`) after voicing, after Step 5's `fetch-sfx`, and after any re-voice. On failure stop and list the frames.
    - The user reviews the frame plan, the sketch board and the final preview before the render. Music is `none`; captions follow the config `captions`.
    - A change request at the preview rebuilds only the named frames, plus any frame whose length changes.
-3. After the render, run the sync check, record it in `RUN.md`, set `stage: done`, and report the MP4 path, its length, the sync difference, and the frame ids.
+   - Before the preview review, the claim check: every name, number, date, status or capability shown on screen must come from the approved digest or the sources; ungrounded lines are reworded in the digest's terms.
+3. After the render, run the sync check, make the intro title the video's first frame (the thumbnail chat apps show), write a one-to-three-sentence `renders/share-copy.txt` from the approved digest, set `stage: done`, and report the MP4 path, its length, the sync difference, the cover time, the caption and the frame ids.
 
 ## Stop conditions
 

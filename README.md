@@ -84,7 +84,13 @@ In Claude Code:
 /spec-reel https://example.com/plan ~/plans/feature-spec.md
 ```
 
-The skill asks, in one batch: the links or files, the audience and intent, the target length (default 60-90 seconds) and the voice source. Then approve the digest, approve the script, and review the frame plan, the sketch board and the preview. The MP4 is written to `renders/video.mp4` inside the run folder.
+The skill asks, in one batch: the links or files, the audience and intent, the target length (default 60-90 seconds) and the voice source. Then approve the digest, approve the script, and review the frame plan, the sketch board and the preview. Before the preview, the skill checks that every name, number and capability shown on screen comes from your sources.
+
+Inside the run folder, `renders/` then holds:
+
+- `video.mp4`, whose first frame is the intro title, so chat apps show it as the thumbnail;
+- `cover.jpg`, that same frame, for platforms that take a separate thumbnail;
+- `share-copy.txt`, a one-to-three-sentence caption to post with the video.
 
 ## Tests
 
@@ -93,6 +99,10 @@ python3 -I -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
 The tests use fakes for ffmpeg, ffprobe, transcription and the Qwen3-TTS model, so they need none of them.
+
+## Credits
+
+The cover frame, the share caption and the on-screen claim check are adapted from [brag](https://github.com/latent-spaces/brag) by Shunit Haviv Hakimi (MIT).
 
 ## License
 
