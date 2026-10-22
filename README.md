@@ -66,9 +66,12 @@ cp config.example.json config.json
 |---|---|
 | `output_root` | Where run folders go. Default `~/Movies/hyperframes`. |
 | `style_preset` | The look of the scenes. Default `blue-professional`, the one the bundled scene template implements; for another, restyle a copy of `assets/index.template.html` as `build/index.template.html` in the run. |
-| `voice_source` | `qwen` (Qwen3-TTS on your Mac, default) or `own` (your own engine). |
+| `voice_source` | `qwen` (Qwen3-TTS on your Mac, default) or `own` (your own engine). `clone` (your cloned voice) is opt-in: the skill offers it at the voice question and never sets it. |
 | `qwen_speaker` | `Aiden` (default) or `Ryan`, the two English voices. |
 | `qwen_instruct` | A style instruction for Qwen3-TTS. Empty means a calm, conversational narrator. |
+| `qwen_clone_audio` | Path to a recording of the voice to clone (`~` allowed). Empty by default; setting it does not select the clone. |
+| `qwen_clone_transcript` | Path to a text file with exactly what that recording says. Empty by default. |
+| `qwen_tempo` | Pace of any Qwen3-TTS voice, `0.5` to `2.0`; below `1.0` is slower, pitch unchanged. Default `1.0`. |
 | `tts_command` | Default command for your own engine. Empty means you drop audio files. |
 | `slide_pause_s` | Seconds of silence after every line but the last. Default `1.0`. |
 | `captions` | `off` (default) or `on`. |
@@ -81,6 +84,13 @@ cp config.example.json config.json
 ```bash
 uv run --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
   python scripts/qwen_voice.py <run folder> --speaker Aiden
+```
+
+**Your cloned voice (optional).** Pick it at the voice question of a run; it is never the default. Record 10 to 20 seconds of clear speech as a WAV file and write exactly what you say into a text file. The skill asks for both paths the first time and remembers them in `config.json`. Use only your own voice, or the voice of someone who agreed to it being cloned. It is still Qwen3-TTS on your Mac, with the Base model (`mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16`, downloads once, about 4 GB). Cloned speech often comes out faster than the speaker talks: set `qwen_tempo` to about `0.8` if it sounds rushed. By hand:
+
+```bash
+uv run --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
+  python scripts/qwen_voice.py <run folder> --clone-audio me.wav --clone-transcript me.txt --tempo 0.8
 ```
 
 **Your own engine.** The skill lists every script line with its frame number and a target file name, `voice-in/NN.<ext>`. Either drop one audio file per line (WAV, MP3, M4A or AIFF), or give a command and the skill runs it once per line. In a command, `{text_file}` is a temp file holding the line's text and `{out}` is `voice-in/NN` with no extension; the command supplies its own extension:

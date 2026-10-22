@@ -127,6 +127,8 @@ uv run -q --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
   python <this skill's directory>/scripts/qwen_voice.py . --speaker <config qwen_speaker>
 ```
 
+When the run's voice source is `clone`, add `--clone-audio "<config qwen_clone_audio>" --clone-transcript "<config qwen_clone_transcript>"` (then `--speaker` and `--instruct` are not needed): the lines are voiced in the speaker of that recording, one sentence at a time with a short pause between them. Add `--tempo <config qwen_tempo>` when it is not `1.0`: it slows (below 1) or speeds the voice after generation, without changing pitch.
+
 Append `--say <written>=<spoken>` for each entry of config `pronunciations`. Add `--instruct "<config qwen_instruct>"` when that value is set; when it is empty the script uses a calm, conversational narrator. The first run downloads the model (about 4 GB) into the Hugging Face cache; later runs load it in seconds. It writes `voice-in/NN.wav` for every line, or only the lines named with `--frames <N...>` or `--frames-with <word>` (the frames whose spoken text has that word or its plural; pick frames by word, never by grep line numbers).
 
 Before it replaces a file it copies it into `voice-takes/<timestamp>/`. `--restore <timestamp> --frames <N...>` puts a take back (without `--frames`, every file in it); the file it replaces is saved too. Never delete `voice-takes/`.
@@ -152,7 +154,7 @@ It writes `SCRIPT.md` from `user_script.txt`, converts each file to `assets/voic
 
 ## Speech check (Qwen3-TTS)
 
-Run `python3 -I <this skill's directory>/scripts/adopt_voice.py . --check-speech`. It lists real differences only: case, spaces and hyphens inside a word, digits for number words, and the respellings are not differences. For each listed frame, re-voice it with `qwen_voice.py --frames <N...>` and re-run `adopt_voice.py . --pause <s>`; at most two retake rounds. If a frame still differs, open its `voice-in/NN.wav` for the user and ask once: keep it, reword the line (re-opens gate 2), or add a `pronunciations` entry and retake. For the own engine, show the list and let the user decide.
+Run `python3 -I <this skill's directory>/scripts/adopt_voice.py . --check-speech`. It lists real differences only: case, spaces and hyphens inside a word, digits for number words, and the respellings are not differences. It applies to the cloned voice exactly as to the built-in speaker. For each listed frame, re-voice it with `qwen_voice.py --frames <N...>` and re-run `adopt_voice.py . --pause <s>`; at most two retake rounds. If a frame still differs, open its `voice-in/NN.wav` for the user and ask once: keep it, reword the line (re-opens gate 2), or add a `pronunciations` entry and retake. For the own engine, show the list and let the user decide.
 
 ## Voice check
 
@@ -162,7 +164,7 @@ python3 -I <this skill's directory>/scripts/adopt_voice.py . --check
 
 It confirms that every frame whose storyboard `voiceover` is non-empty has a voice entry in `audio_meta.json` with an existing WAV and a non-empty `words` list. Silent frames are skipped. `finish.py` runs it; run it by hand after any re-voice.
 
-**On failure:** stop before building. Say: "These scenes have no voice or word timings: <frame list>. Voice source: <Qwen3-TTS | your own engine>." Then offer to switch the whole run to the other voice source. On yes: record the new source in `RUN.md`, delete `audio_meta.json`, `audio_engine_meta.json`, `voice-in/`, `voice-cache/` and `assets/voice/`, and continue from the voicing step with the new source. A run never mixes sources.
+**On failure:** stop before building. Say: "These scenes have no voice or word timings: <frame list>. Voice source: <Qwen3-TTS | cloned voice | your own engine>." Then offer the other voice source: the default Qwen3-TTS speaker when the clone failed, the user's own engine when Qwen3-TTS failed. On yes: record the new source in `RUN.md`, delete `audio_meta.json`, `audio_engine_meta.json`, `voice-in/`, `voice-cache/` and `assets/voice/`, and continue from the voicing step with the new source. A run never mixes sources.
 
 ## Review and render: `finish.py`
 
