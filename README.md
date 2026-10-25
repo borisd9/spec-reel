@@ -6,7 +6,7 @@
 
 An agent skill (Claude Code, Codex, Cursor and other agents that read `SKILL.md`) that turns links to plans and specs into a short narrated explainer video.
 
-You give it one or more links or files. It reads them, writes a digest of why each plan exists, what it changes and what comes next, and writes a timestamped narration script. You approve both. It voices the script on your Mac with [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) through [MLX-Audio](https://github.com/Blaizzy/mlx-audio), or takes audio you make with any text-to-speech tool you choose. Then it builds one scene per script line with the HyperFrames explainer route, each cued on the words of its narration, and renders an MP4.
+You give it one or more links or files. It reads them, writes a digest of why each plan exists, what it changes and what comes next, and writes a timestamped narration script. You approve both. It voices the script on your Mac with [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) through [MLX-Audio](https://github.com/Blaizzy/mlx-audio), optionally in your own cloned voice, or takes audio you make with any text-to-speech tool you choose. Then it builds one scene per script line with the HyperFrames explainer route, each cued on the words of its narration, and renders an MP4.
 
 Every video opens with an intro scene: the approved title on screen, narrated by one short sentence on what the video is about. When the feature can be shown, a demo scene shows it: a mock or a screen recording found in your sources or given by you. You can skip the demo.
 
@@ -141,7 +141,7 @@ Inside the run folder, `renders/` then holds:
 python3 -I -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
-The tests use fakes for ffmpeg, ffprobe, transcription and the Qwen3-TTS model, so they need none of them. `scripts/test_skill_structure.py` also checks that the documents agree: every named file and link exists (scripts, references, assets), no document names a retired skill, and `config.example.json` matches the table above.
+The tests use fakes for ffmpeg, ffprobe, transcription and the Qwen3-TTS model, so they need none of them. `scripts/test_skill_structure.py` also checks that the documents agree: every named file and link exists (scripts, references, assets), no document names a retired skill or assumes one coding agent, and `config.example.json` matches the table above.
 
 Every pull request runs `.github/workflows/checks.yml`: these tests on Linux and macOS, `ruff`, a gitleaks secret scan, and a scan for names the repository keeps private (its word list is a repository secret, so pull requests from forks skip it).
 
