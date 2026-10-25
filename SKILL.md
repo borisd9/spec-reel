@@ -6,11 +6,11 @@ argument-hint: "[--yolo] links or paths to plans and specs"
 
 # Spec Reel
 
-Links or files of plans and specs in, a narrated MP4 out. This skill owns the sources, the digest, the script, the voice, the review gates and the scripts that build and render (`scripts/`). It builds the scenes with the installed HyperFrames explainer route, `~/.claude/skills/hyperframes/references/types/explainer.md`.
+Links or files of plans and specs in, a narrated MP4 out. This skill owns the sources, the digest, the script, the voice, the review gates and the scripts that build and render (`scripts/`). It builds the scenes with the installed HyperFrames explainer route, `<hyperframes dir>/references/types/explainer.md` (`references/handoff.md` § Files this skill needs finds `<hyperframes dir>`).
 
 Stages: sources, digest, title and demo (gate 1), script (gate 2), frame plan, scenes, review stills, render. The user approves at each gate; nothing is voiced or built before gate 2.
 
-Do not invoke the `hyperframes` skill through the Skill tool (it may be disabled for model invocation). Read its files directly, under `~/.claude/skills/hyperframes/`.
+Do not load the `hyperframes` skill as a skill (some agents block that for model invocation); read its files directly, under `<hyperframes dir>/`.
 
 `<this skill's directory>` below means the folder that holds this `SKILL.md`.
 
@@ -37,7 +37,7 @@ Every run has one folder holding all its artifacts, and a `RUN.md` that records 
 
 Run folders are never deleted.
 
-**Resume:** show the recorded run answers in one line and continue from the recorded stage. Do not ask the run questions again, read the sources again, or regenerate approved work. Before continuing, compare each approved file's SHA-256 with the one in `RUN.md`. When one differs, tell the user which file changed and re-open its gate: a changed digest re-opens gate 1 and then gate 2; a changed `user_script.txt` re-opens gate 2 and then re-runs the frame plan and the scenes. At stage `scenes`, read `references/handoff.md` and the explainer route again before acting.
+**Resume:** show the recorded run answers in one line and continue from the recorded stage. Reuse the recorded `hyperframes` path after checking that it still exists; when it does not, search again. Do not ask the run questions again, read the sources again, or regenerate approved work. Before continuing, compare each approved file's SHA-256 with the one in `RUN.md`. When one differs, tell the user which file changed and re-open its gate: a changed digest re-opens gate 1 and then gate 2; a changed `user_script.txt` re-opens gate 2 and then re-runs the frame plan and the scenes. At stage `scenes`, read `references/handoff.md` and the explainer route again before acting.
 
 **New run:** ask these in one batch (defaults in brackets):
 
@@ -48,7 +48,7 @@ Run folders are never deleted.
 
 When the user picks the cloned voice: if `qwen_clone_audio` or `qwen_clone_transcript` is empty, ask for both paths in one message and save them to `config.json`. The first time a sample is used, ask once whether it is the user's own voice or used with the speaker's permission; if not, use the default voice instead. Then check that both files exist; when one is missing, name it and offer the default voice.
 
-Then check that the files this skill needs exist (the loop under "Files this skill needs" in `references/handoff.md`); when one is missing, stop and name it. Then, from the folder that will contain the run folder:
+Then check that the files this skill needs exist ("Files this skill needs" in `references/handoff.md`). Then, from the folder that will contain the run folder:
 
 ```bash
 npx hyperframes init "<folder>" --non-interactive --example=blank --skill=spec-reel
@@ -62,6 +62,7 @@ npx hyperframes init "<folder>" --non-interactive --example=blank --skill=spec-r
 stage: sources            # sources | digest | script | scenes | done
 
 ## Answers
+- hyperframes: <path of the HyperFrames skill folder>
 - sources: <links or paths as given>
 - audience: ...
 - intent: ...
@@ -154,7 +155,7 @@ Set `stage: scenes`. Everything from here is in `references/handoff.md`; read it
 
 Stop and tell the user, without improvising, when:
 
-- a file the skill needs is missing under `~/.claude/skills/hyperframes/` (name it) or `npx hyperframes check --help` fails;
-- a step would need the `hyperframes` skill through the Skill tool;
+- a file the skill needs is missing under `<hyperframes dir>` (name it) or `npx hyperframes check --help` fails;
+- a step would need the `hyperframes` skill loaded as a skill;
 - a voice check fails and the user declines to switch voice source;
 - a `finish.py` step still fails after three fixes, or its cause is not in the run's own files (a scene, the script, the voice): say which step and show the error.
