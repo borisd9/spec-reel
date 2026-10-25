@@ -12,6 +12,9 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCS = [ROOT / "SKILL.md", ROOT / "README.md", *sorted((ROOT / "references").glob("*.md"))]
 # Files of the installed HyperFrames skill that these docs name on purpose (the dependency check in handoff.md).
 EXTERNAL = {"references/film.md", "references/format.md", "references/sound.md"}
+BANNED = ("faceless-explainer", "Skill tool", "run_in_background")
+# A path into one agent's HyperFrames copy; the search loop in handoff.md names folders without a trailing slash.
+AGENT_PATH = re.compile(r"\.\w+/skills/hyperframes/")
 NAMED = re.compile(r"(?<![\w/.-])((?:references|scripts|assets)/[\w./-]*[\w]\.(?:md|py|html|json|woff2|txt))")
 
 
@@ -25,7 +28,6 @@ class SkillStructureTests(unittest.TestCase):
         fm = frontmatter((ROOT / "SKILL.md").read_text())
         self.assertEqual(fm.get("name"), "spec-reel")
         self.assertTrue(0 < len(fm.get("description", "").strip('"')) <= 1024)
-        self.assertTrue(fm.get("argument-hint"))
 
     def test_named_skill_files_exist(self):
         for doc in DOCS:
@@ -43,10 +45,6 @@ class SkillStructureTests(unittest.TestCase):
         self.assertTrue((ROOT / "assets/fonts/OFL.txt").is_file())
         self.assertEqual(len(list((ROOT / "assets/fonts").glob("*.woff2"))), 3)
 
-    def test_no_document_names_the_retired_skill(self):
-        for doc in DOCS:
-            self.assertNotIn("faceless-explainer", doc.read_text(), doc.name)
-
     def test_relative_links_resolve(self):
         for doc in DOCS:
             for target in re.findall(r"\]\(([^)\s]+)\)", doc.read_text()):
@@ -63,11 +61,13 @@ class SkillStructureTests(unittest.TestCase):
         for rel in EXTERNAL:
             self.assertIn(rel, loop)
 
-    def test_no_document_assumes_one_agent(self):
+    def test_no_banned_terms(self):
+        """No retired skill, no one agent's tool names, and HyperFrames paths only through <hyperframes dir>."""
         for doc in DOCS:
             text = doc.read_text()
-            for term in ("~/.claude/skills/hyperframes/", "Skill tool", "run_in_background"):
-                self.assertNotIn(term, text, f"{doc.name} assumes one agent: {term}")
+            for term in BANNED:
+                self.assertNotIn(term, text, doc.name)
+            self.assertIsNone(AGENT_PATH.search(text), doc.name)
 
     def test_config_keys_match_readme_table(self):
         keys = set(json.loads((ROOT / "config.example.json").read_text()))

@@ -6,7 +6,7 @@ argument-hint: "[--yolo] links or paths to plans and specs"
 
 # Spec Reel
 
-Links or files of plans and specs in, a narrated MP4 out. This skill owns the sources, the digest, the script, the voice, the review gates and the scripts that build and render (`scripts/`). It builds the scenes with the installed HyperFrames explainer route, `<hyperframes dir>/references/types/explainer.md`. `<hyperframes dir>` is the HyperFrames skill folder; `references/handoff.md` § Files this skill needs says how to find it.
+Links or files of plans and specs in, a narrated MP4 out. This skill owns the sources, the digest, the script, the voice, the review gates and the scripts that build and render (`scripts/`). It builds the scenes with the installed HyperFrames explainer route, `<hyperframes dir>/references/types/explainer.md` (`references/handoff.md` § Files this skill needs finds `<hyperframes dir>`).
 
 Stages: sources, digest, title and demo (gate 1), script (gate 2), frame plan, scenes, review stills, render. The user approves at each gate; nothing is voiced or built before gate 2.
 
@@ -48,7 +48,7 @@ Run folders are never deleted.
 
 When the user picks the cloned voice: if `qwen_clone_audio` or `qwen_clone_transcript` is empty, ask for both paths in one message and save them to `config.json`. The first time a sample is used, ask once whether it is the user's own voice or used with the speaker's permission; if not, use the default voice instead. Then check that both files exist; when one is missing, name it and offer the default voice.
 
-Then check that the files this skill needs exist (the loop under "Files this skill needs" in `references/handoff.md`; install HyperFrames when it is missing, per that section); when one is missing, stop and name it. Then, from the folder that will contain the run folder:
+Then check that the files this skill needs exist ("Files this skill needs" in `references/handoff.md`). Then, from the folder that will contain the run folder:
 
 ```bash
 npx hyperframes init "<folder>" --non-interactive --example=blank --skill=spec-reel
@@ -155,7 +155,7 @@ Set `stage: scenes`. Everything from here is in `references/handoff.md`; read it
 
 Stop and tell the user, without improvising, when:
 
-- a file the skill needs is missing under `<hyperframes dir>` after the install step (name it) or `npx hyperframes check --help` fails;
+- a file the skill needs is missing under `<hyperframes dir>` (name it) or `npx hyperframes check --help` fails;
 - a step would need the `hyperframes` skill loaded as a skill;
 - a voice check fails and the user declines to switch voice source;
 - a `finish.py` step still fails after three fixes, or its cause is not in the run's own files (a scene, the script, the voice): say which step and show the error.

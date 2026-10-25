@@ -141,7 +141,7 @@ Inside the run folder, `renders/` then holds:
 python3 -I -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
-The tests use fakes for ffmpeg, ffprobe, transcription and the Qwen3-TTS model, so they need none of them. `scripts/test_skill_structure.py` also checks that the documents agree: every named file and link exists (scripts, references, assets), no document names a retired skill or assumes one coding agent, and `config.example.json` matches the table above.
+The tests use fakes for ffmpeg, ffprobe, transcription and the Qwen3-TTS model, so they need none of them. `scripts/test_skill_structure.py` also checks that the documents agree: every named file and link exists (scripts, references, assets), no document names a retired skill, one agent's skill folder or tool names, and `config.example.json` matches the table above.
 
 Every pull request runs `.github/workflows/checks.yml`: these tests on Linux and macOS, `ruff`, a gitleaks secret scan, and a scan for names the repository keeps private (its word list is a repository secret, so pull requests from forks skip it).
 

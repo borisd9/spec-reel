@@ -2,7 +2,7 @@
 
 After gate 2 (the approved script), this skill voices the script, plans the frames, builds one scene per line with the installed HyperFrames explainer route, and renders. Everything that can be a command is one (`scripts/`); this file says when to run which.
 
-Do not load the `hyperframes` skill as a skill (some agents block that for model invocation); read its files directly. `<hyperframes dir>` is the HyperFrames skill folder found at `init` and recorded in `RUN.md`; the explainer route is `<hyperframes dir>/references/types/explainer.md`, and `format.md`, `film.md` and `sound.md` in the same `references/` folder hold the render contract, the pacing and the sound rules.
+The explainer route is `<hyperframes dir>/references/types/explainer.md`, and `format.md`, `film.md` and `sound.md` in the same `references/` folder hold the render contract, the pacing and the sound rules.
 
 When resuming at stage `scenes`, read this file and the explainer route again, then continue from `STORYBOARD.md`'s `status` lines.
 
@@ -11,14 +11,14 @@ When resuming at stage `scenes`, read this file and the explainer route again, t
 At `init`, before anything else, find the HyperFrames skill folder. The first folder that has `references/types/explainer.md` wins:
 
 ```bash
-for d in "<this skill's directory>/../hyperframes" .agents/skills/hyperframes .claude/skills/hyperframes ~/.agents/skills/hyperframes ~/.claude/skills/hyperframes ~/.codex/skills/hyperframes; do
+for d in "<this skill's directory>/../hyperframes" .agents/skills/hyperframes .claude/skills/hyperframes ~/.agents/skills/hyperframes ~/.claude/skills/hyperframes; do
   test -f "$d/references/types/explainer.md" && { echo "$d"; break; }
 done
 ```
 
-When it prints nothing, HyperFrames is not installed. Interactive mode asks once: "HyperFrames is not installed. Install it now with `npx hyperframes skills`?" On yes, run it and search again. On no, or when it is still not found, stop and name the command. Yolo mode runs it without asking and lists it in the final report.
+When it prints nothing, ask once to install HyperFrames with `npx hyperframes skills`, then search again (yolo: `references/yolo.md`). On no, or when it is still not found, stop and name the command.
 
-Call the folder found `<hyperframes dir>` and record it as `- hyperframes: <path>` under `## Answers` in `RUN.md`. Then check these exist, and stop naming each one that does not:
+Call the folder found `<hyperframes dir>` and record it in `RUN.md`. Then check these exist, and stop naming each one that does not:
 
 ```bash
 for f in SKILL.md references/types/explainer.md references/film.md references/format.md references/sound.md; do
@@ -30,7 +30,7 @@ Also stop when `npx hyperframes check --help` fails: the layout check and the st
 
 ## The order, with what overlaps
 
-1. Gate 2 approves `user_script.txt`. Run the script check (below), then start voicing and adopting **in the background** (the agent's background-command feature, or `nohup <command> > voice.log 2>&1 &`): Qwen3-TTS and the transcription take minutes and nothing below needs them until the build.
+1. Gate 2 approves `user_script.txt`. Run the script check (below), then start voicing and adopting **in the background**: Qwen3-TTS and the transcription take minutes and nothing below needs them until the build.
 2. Meanwhile write `STORYBOARD.md`, get the frame plan reviewed (interactive mode), and write the scenes. Cues need `audio_meta.json` only when `build_index.py` runs.
 3. When the voice is adopted: speech check, voice check, then `finish.py --review` and look at the stills.
 4. After approval, `finish.py --final`.
