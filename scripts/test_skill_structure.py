@@ -63,6 +63,12 @@ class SkillStructureTests(unittest.TestCase):
         for rel in EXTERNAL:
             self.assertIn(rel, loop)
 
+    def test_no_document_assumes_one_agent(self):
+        for doc in DOCS:
+            text = doc.read_text()
+            for term in ("~/.claude/skills/hyperframes/", "Skill tool", "run_in_background"):
+                self.assertNotIn(term, text, f"{doc.name} assumes one agent: {term}")
+
     def test_config_keys_match_readme_table(self):
         keys = set(json.loads((ROOT / "config.example.json").read_text()))
         configure = re.search(r"^## Configure\n(.*?)(?=^## )", (ROOT / "README.md").read_text(), re.S | re.M).group(1)

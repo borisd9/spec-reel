@@ -1,8 +1,10 @@
 # Spec Reel
 
+[![skills.sh](https://skills.sh/b/borisd9/spec-reel)](https://skills.sh/borisd9/spec-reel)
+
 <img width="1024" height="572" alt="Spec Reel logo" src="https://github.com/user-attachments/assets/586ad0a4-15ee-4b85-a283-3bf0f9c668e2" />
 
-A Claude Code skill that turns links to plans and specs into a short narrated explainer video.
+An agent skill (Claude Code, Codex, Cursor and other agents that read `SKILL.md`) that turns links to plans and specs into a short narrated explainer video.
 
 You give it one or more links or files. It reads them, writes a digest of why each plan exists, what it changes and what comes next, and writes a timestamped narration script. You approve both. It voices the script on your Mac with [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice) through [MLX-Audio](https://github.com/Blaizzy/mlx-audio), or takes audio you make with any text-to-speech tool you choose. Then it builds one scene per script line with the HyperFrames explainer route, each cued on the words of its narration, and renders an MP4.
 
@@ -27,8 +29,8 @@ Every run has its own folder with a `RUN.md` that records the stage and each app
 
 ## Prerequisites
 
-- Claude Code
-- The HyperFrames skills (the skill's explainer route): `npx hyperframes skills`
+- A coding agent that reads Agent Skills (`SKILL.md`)
+- The HyperFrames skills: `npx hyperframes skills` (the skill offers to run this when they are missing)
 - Node.js with `npx`
 - Python 3.10 or later
 - `ffmpeg` and `ffprobe` on your path
@@ -37,7 +39,11 @@ Every run has its own folder with a `RUN.md` that records the stage and each app
 
 ## Install
 
-Clone it into your skills folder:
+```bash
+npx skills add borisd9/spec-reel
+```
+
+Or clone it into your skills folder (`~/.claude/skills/` for Claude Code, or the skills folder your agent reads):
 
 ```bash
 git clone https://github.com/borisd9/spec-reel.git ~/.claude/skills/spec-reel
@@ -50,9 +56,9 @@ git clone https://github.com/borisd9/spec-reel.git ~/skills/spec-reel
 ln -s ~/skills/spec-reel ~/.claude/skills/spec-reel
 ```
 
-Start a new Claude Code session. `spec-reel` appears in the skill list.
+Start a new agent session. `spec-reel` appears in the skill list.
 
-To update later, pull in the folder you cloned: `git -C ~/.claude/skills/spec-reel pull` (or `~/skills/spec-reel` for a linked clone).
+To update later, re-run `npx skills add borisd9/spec-reel`, or pull in the folder you cloned: `git -C ~/.claude/skills/spec-reel pull` (or `~/skills/spec-reel` for a linked clone).
 
 ## Configure
 
@@ -105,7 +111,7 @@ The spoken text reaches the command only through `{text_file}`. A command never 
 
 ## First run
 
-In Claude Code:
+Ask your agent to use spec-reel on your links. In Claude Code:
 
 ```text
 /spec-reel https://example.com/plan ~/plans/feature-spec.md
@@ -117,7 +123,7 @@ For a run with no questions at all, add `--yolo`:
 /spec-reel --yolo https://example.com/plan ~/plans/feature-spec.md
 ```
 
-It uses the defaults (a team update, about 75 seconds, the configured voice), decides every review itself, renders the MP4, and ends with a list of everything it decided without you. It never posts or shares the video. Claude Code may still ask permission to run commands (`npx`, `ffmpeg`, `uv`, `curl`, `gh`) unless your permission mode allows them.
+It uses the defaults (a team update, about 75 seconds, the configured voice), decides every review itself, renders the MP4, and ends with a list of everything it decided without you. It never posts or shares the video. Your agent may still ask permission to run commands (`npx`, `ffmpeg`, `uv`, `curl`, `gh`) unless your permission mode allows them.
 
 Without `--yolo`, the skill asks, in one batch: the links or files, the audience and intent, the target length (default 60-90 seconds) and the voice source. Then approve the digest, approve the script, review the frame plan, and approve the stills before the render. Before the stills, the skill checks that every name, number and capability shown on screen comes from your sources.
 

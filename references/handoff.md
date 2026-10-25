@@ -2,17 +2,27 @@
 
 After gate 2 (the approved script), this skill voices the script, plans the frames, builds one scene per line with the installed HyperFrames explainer route, and renders. Everything that can be a command is one (`scripts/`); this file says when to run which.
 
-Do not invoke the `hyperframes` skill through the Skill tool; it may be disabled for model invocation. Read its files directly. Its folder is `~/.claude/skills/hyperframes/`; the explainer route is `~/.claude/skills/hyperframes/references/types/explainer.md`, and `format.md`, `film.md` and `sound.md` in the same `references/` folder hold the render contract, the pacing and the sound rules.
+Do not load the `hyperframes` skill as a skill (some agents block that for model invocation); read its files directly. `<hyperframes dir>` is the HyperFrames skill folder found at `init` and recorded in `RUN.md`; the explainer route is `<hyperframes dir>/references/types/explainer.md`, and `format.md`, `film.md` and `sound.md` in the same `references/` folder hold the render contract, the pacing and the sound rules.
 
 When resuming at stage `scenes`, read this file and the explainer route again, then continue from `STORYBOARD.md`'s `status` lines.
 
 ## Files this skill needs
 
-At `init`, before anything else, check these exist, and stop naming each one that does not (the fix is `npx hyperframes skills`):
+At `init`, before anything else, find the HyperFrames skill folder. The first folder that has `references/types/explainer.md` wins:
+
+```bash
+for d in "<this skill's directory>/../hyperframes" .agents/skills/hyperframes .claude/skills/hyperframes ~/.agents/skills/hyperframes ~/.claude/skills/hyperframes ~/.codex/skills/hyperframes; do
+  test -f "$d/references/types/explainer.md" && { echo "$d"; break; }
+done
+```
+
+When it prints nothing, HyperFrames is not installed. Interactive mode asks once: "HyperFrames is not installed. Install it now with `npx hyperframes skills`?" On yes, run it and search again. On no, or when it is still not found, stop and name the command. Yolo mode runs it without asking and lists it in the final report.
+
+Call the folder found `<hyperframes dir>` and record it as `- hyperframes: <path>` under `## Answers` in `RUN.md`. Then check these exist, and stop naming each one that does not:
 
 ```bash
 for f in SKILL.md references/types/explainer.md references/film.md references/format.md references/sound.md; do
-  test -f ~/.claude/skills/hyperframes/$f || echo "missing: ~/.claude/skills/hyperframes/$f"
+  test -f "<hyperframes dir>/$f" || echo "missing: <hyperframes dir>/$f"
 done
 ```
 
@@ -20,14 +30,14 @@ Also stop when `npx hyperframes check --help` fails: the layout check and the st
 
 ## The order, with what overlaps
 
-1. Gate 2 approves `user_script.txt`. Run the script check (below), then start voicing and adopting **in the background** (`run_in_background`): Qwen3-TTS and the transcription take minutes and nothing below needs them until the build.
+1. Gate 2 approves `user_script.txt`. Run the script check (below), then start voicing and adopting **in the background** (the agent's background-command feature, or `nohup <command> > voice.log 2>&1 &`): Qwen3-TTS and the transcription take minutes and nothing below needs them until the build.
 2. Meanwhile write `STORYBOARD.md`, get the frame plan reviewed (interactive mode), and write the scenes. Cues need `audio_meta.json` only when `build_index.py` runs.
 3. When the voice is adopted: speech check, voice check, then `finish.py --review` and look at the stills.
 4. After approval, `finish.py --final`.
 
 ## STORYBOARD.md
 
-Write it into the run folder after `init`. Shape per `~/.claude/skills/hyperframes/references/storyboard-format.md`. One frame per line of `user_script.txt`, in the same order, with the same spoken words (`voiceover`). Labels, `Time` and `Delivery` may change, except that Line 1 stays labeled `Intro`.
+Write it into the run folder after `init`. Shape per `<hyperframes dir>/references/storyboard-format.md`. One frame per line of `user_script.txt`, in the same order, with the same spoken words (`voiceover`). Labels, `Time` and `Delivery` may change, except that Line 1 stays labeled `Intro`.
 
 ```markdown
 ---
@@ -88,7 +98,7 @@ Changing a fact changes every scene on the next `finish.py` run. A spoken fact a
 
 ## Scenes
 
-Read `~/.claude/skills/hyperframes/references/types/explainer.md` first: one idea, one concrete example worked through, a diagram that grows, the voice as the clock. Then build one scene per frame:
+Read `<hyperframes dir>/references/types/explainer.md` first: one idea, one concrete example worked through, a diagram that grows, the voice as the clock. Then build one scene per frame:
 
 1. Copy `assets/scene.template.html` to `compositions/<id>.html` and replace `SCENE_ID`. The shared vocabulary (`.stage`, `.eyebrow`, `.title`, `.card`, `.label`, `.num`, `.tag`...) and the `window.fx` helpers (`blur`, `rise`, `slide`, `pop`, `fade`, `grow`, `type`, `exit`, `at`, `fact`) live in the run's `index.html`, which `build_index.py` writes from `assets/index.template.html`. The template is the `blue-professional` preset with Space Grotesk (bundled in `assets/fonts/`, copied into the run by the build). For another preset, copy the template to `build/index.template.html` in the run and restyle it; `build_index.py` prefers that copy.
 2. **Cue by word text.** `at("feed")` is the start of the first "feed" in the line, `at("draft", 2)` of the second. It survives edits to the words before it. `w(i)` (by word index) still works but breaks when words are added. `build_index.py` checks every `at()` against the line's words and fails the build for a word that is not there.
