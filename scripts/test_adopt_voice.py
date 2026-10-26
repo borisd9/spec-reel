@@ -32,10 +32,12 @@ SCRIPT = """# SCRIPT
 """
 
 
-def fake_to_wav(src, dst, pad_s=0.0):
-    if Path(src).read_text() == "BAD":
+def fake_to_wav(srcs, dst, pad_s=0.0):
+    """The joined "audio": each source's text on its own line, in order, then the pad marker."""
+    texts = [Path(s).read_text() for s in srcs]
+    if "BAD" in texts:
         raise RuntimeError("cannot decode")
-    Path(dst).write_text(Path(src).read_text() + (f"\nPAD {pad_s}" if pad_s > 0 else ""))
+    Path(dst).write_text("\n".join(texts) + (f"\nPAD {pad_s}" if pad_s > 0 else ""))
 
 
 def spoken(wav):
@@ -349,6 +351,163 @@ class CacheTests(Base):
         self.assertIn("(0 transcribed, 3 from voice-cache/)", out.getvalue())
 
 
+DISCUSSION = """## Line 1 — Intro (Frame 1)
+    A short tour of the upload flow.
+## Line 2 — Retries (Frame 2)
+### Turn — A
+    What changed for retries?
+### Turn — B
+    Failed uploads now retry on their own.
+### Turn — A
+    How many times?
+## Line 3 — End (Frame 3)
+    Next up is more.
+"""
+
+
+class TurnTests(Base):
+    """A frame with `### Turn — A|B` headings is voiced as voice-in/NN.K.<ext>, joined into one NN.wav."""
+
+    def setUp(self):
+        super().setUp()
+        (self.p / "SCRIPT.md").write_text(DISCUSSION)
+
+    def files(self):
+        self.voice_in("01.wav", "a short tour of the upload flow")
+        self.voice_in("02.1.wav", "what changed for retries")
+        self.voice_in("02.2.mp3", "failed uploads now retry on their own")
+        self.voice_in("02.3.m4a", "how many times")
+        self.voice_in("03.wav", "next up is more")
+
+    def test_parse_turns_holds_only_frames_with_turns(self):
+        self.assertEqual(av.parse_turns(DISCUSSION), {2: [("A", "What changed for retries?"),
+                                                          ("B", "Failed uploads now retry on their own."),
+                                                          ("A", "How many times?")]})
+        self.assertEqual(av.parse_turns(SCRIPT), {})
+
+    def test_parse_script_joins_the_turns_into_the_frames_text(self):
+        self.assertEqual(av.parse_script(DISCUSSION)[1],
+                         (2, "What changed for retries? Failed uploads now retry on their own. How many times?"))
+
+    def test_turns_join_in_order_into_one_wav_and_one_word_list(self):
+        self.files()
+        code, err = self.run_main()
+        self.assertEqual(code, 0, err)
+        self.assertEqual((self.p / "assets/voice/02.wav").read_text(),
+                         "what changed for retries\nfailed uploads now retry on their own\nhow many times")
+        self.assertEqual((self.p / "assets/voice/01.wav").read_text(), "a short tour of the upload flow")
+        v = [x for x in self.meta()["voices"] if x["frame"] == 2][0]
+        self.assertEqual(v["path"], "assets/voice/02.wav")
+        self.assertEqual(" ".join(w["text"] for w in v["words"]),
+                         "What changed for retries? Failed uploads now retry on their own. How many times?")
+        self.assertEqual(self.run_main("--check-speech"), (0, ""))
+
+    def test_join_follows_the_turn_number_not_the_name_order(self):
+        names = [f"t{i}" for i in range(1, 11)]
+        (self.p / "SCRIPT.md").write_text(
+            "## Line 1 — Intro (Frame 1)\n    Hi.\n## Line 2 — Talk (Frame 2)\n"
+            + "".join(f"### Turn — {'AB'[i % 2]}\n    {n}.\n" for i, n in enumerate(names)))
+        self.voice_in("01.wav", "hi")
+        for i, n in reversed(list(enumerate(names, 1))):  # 02.10 sorts before 02.2 as a string
+            self.voice_in(f"02.{i}.wav", n)
+        self.assertEqual(self.run_main()[0], 0)
+        self.assertEqual((self.p / "assets/voice/02.wav").read_text(), "\n".join(names))
+
+    def test_pause_pads_the_joined_frame_once(self):
+        self.files()
+        self.assertEqual(self.run_main("--pause", "1.5")[0], 0)
+        self.assertEqual(spoken(self.p / "assets/voice/02.wav")[1], 1.5)
+        self.assertEqual(spoken(self.p / "assets/voice/03.wav")[1], 0)
+
+    def test_missing_turn_file_names_frame_and_turn(self):
+        self.files()
+        (self.p / "voice-in/02.2.mp3").unlink()
+        code, err = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2 turn 2: missing", err)
+        self.assertNotIn("frame 1", err)
+        self.assertNotIn("turn 1", err)
+        self.assertFalse((self.p / "audio_meta.json").exists())
+
+    def test_two_files_for_one_turn(self):
+        self.files()
+        self.voice_in("02.2.wav", "failed uploads now retry on their own")
+        code, err = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2 turn 2: several files (02.2.mp3, 02.2.wav)", err)
+
+    def test_plain_file_next_to_turn_files(self):
+        self.files()
+        self.voice_in("02.wav", "what changed for retries")
+        code, err = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2: has 02.wav but the script has turns", err)
+
+    def test_turn_files_for_a_frame_without_turns(self):
+        self.files()
+        self.voice_in("03.1.wav", "next up")
+        code, err = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("frame 3: has turn files but no turns in the script", err)
+
+    def test_turn_file_beyond_the_scripts_turns(self):
+        self.files()
+        self.voice_in("02.4.wav", "extra")
+        code, err = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2: turn file(s) 02.4.wav beyond the script's 3 turns", err)
+
+    def test_a_changed_turn_transcribes_only_its_frame(self):
+        self.files()
+        calls = []
+
+        def counting(wav):
+            calls.append(Path(wav).name)
+            return fake_transcribe(wav)
+
+        def run():
+            with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+                return av.main([str(self.p)], to_wav=fake_to_wav, probe_duration=fake_probe, transcribe=counting)
+
+        self.assertEqual(run(), 0)
+        calls.clear()
+        self.voice_in("02.3.m4a", "how often")
+        self.assertEqual(run(), 0)
+        self.assertEqual(calls, ["02.wav"])
+
+
+class ToWavCommandTests(unittest.TestCase):
+    """The ffmpeg command line, with subprocess.run replaced."""
+
+    def command(self, srcs, pad_s=0.0):
+        seen = []
+        real = av.subprocess.run
+        av.subprocess.run = lambda cmd, **kw: seen.append(cmd)
+        try:
+            av.to_wav(srcs, "out.wav", pad_s)
+        finally:
+            av.subprocess.run = real
+        return seen[0]
+
+    def test_one_source_is_todays_command(self):
+        self.assertEqual(self.command([Path("a.wav")]),
+                         ["ffmpeg", "-y", "-loglevel", "error", "-i", "a.wav", "-ar", "44100", "-ac", "1", "out.wav"])
+        self.assertEqual(self.command([Path("a.wav")], 1.0)[-3:], ["-af", "apad=pad_dur=1.0", "out.wav"])
+
+    def test_several_sources_concat_with_a_gap_between_and_the_pad_at_the_end(self):
+        cmd = self.command([Path("a.wav"), Path("b.wav"), Path("c.wav")], 1.0)
+        self.assertEqual([cmd[i + 1] for i, x in enumerate(cmd) if x == "-i"], ["a.wav", "b.wav", "c.wav"])
+        graph = cmd[cmd.index("-filter_complex") + 1]
+        self.assertEqual(graph.count(f"apad=pad_dur={av.TURN_GAP_S}"), 2)  # between turns, not after the last
+        self.assertIn("concat=n=3:v=0:a=1", graph)
+        self.assertTrue(graph.endswith("apad=pad_dur=1.0[out]"))
+        self.assertEqual(cmd[-7:], ["-map", "[out]", "-ar", "44100", "-ac", "1", "out.wav"])
+
+    def test_several_sources_without_a_pad_end_at_the_concat(self):
+        cmd = self.command([Path("a.wav"), Path("b.wav")])
+        self.assertTrue(cmd[cmd.index("-filter_complex") + 1].endswith("concat=n=2:v=0:a=1[out]"))
+
+
 class HeardTests(unittest.TestCase):
     """Spelling-only differences are not speech errors; a different word is."""
 
@@ -595,6 +754,45 @@ class CheckScriptTests(Base):
         code, err = self.check(INTRO_SCRIPT, moved)
         self.assertNotEqual(code, 0)
         self.assertIn("on_screen_title", err)
+
+    def discussion(self, body):
+        script = "**Voices:** A — Aiden; B — Ryan\n" + body
+        (self.p / "SCRIPT.md").write_text(script)
+        return self.check(script)
+
+    def test_discussion_script_passes(self):
+        code, err = self.discussion(DISCUSSION)
+        self.assertEqual(code, 0, err)
+
+    def test_turn_speaker_must_be_a_or_b(self):
+        code, err = self.discussion(DISCUSSION.replace("### Turn — B", "### Turn — C"))
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2: turn heading must name speaker A or B", err)
+
+    def test_empty_turn_is_named(self):
+        code, err = self.discussion(DISCUSSION.replace("    How many times?\n", ""))
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2 turn 3: no text", err)
+
+    def test_text_before_the_first_turn(self):
+        code, err = self.discussion(DISCUSSION.replace("### Turn — A\n    What", "    Intro words.\n### Turn — A\n    What", 1))
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2: text before its first turn", err)
+
+    def test_turn_speaker_missing_from_the_voices_line(self):
+        (self.p / "user_script.txt").write_text("")
+        script = "**Voices:** A — Aiden\n" + DISCUSSION
+        code, err = self.check(script)
+        self.assertEqual(code, 1)
+        self.assertIn("speaker(s) B missing from the **Voices:** line", err)
+
+    def test_turns_need_a_voices_line(self):
+        code, err = self.check(DISCUSSION)
+        self.assertEqual(code, 1)
+        self.assertIn("no '**Voices:**", err)
+
+    def test_a_script_without_turns_needs_no_voices_line(self):
+        self.assertEqual(self.check(INTRO_SCRIPT)[0], 0)
 
 
 if __name__ == "__main__":

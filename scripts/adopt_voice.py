@@ -2,6 +2,8 @@
 """Adopt narration files (Qwen3-TTS or the user's own engine) into a HyperFrames project.
 
     python3 -I adopt_voice.py <project_dir>                 # voice-in/NN.<ext> -> assets/voice/NN.wav + meta
+                                                            # (a discussion line has voice-in/NN.K.<ext>, one file per
+                                                            # turn, joined with TURN_GAP_S of silence between turns)
                                                             # (SCRIPT.md is first written from user_script.txt; a file
                                                             # already transcribed is read from voice-cache/)
     python3 -I adopt_voice.py <project_dir> --pause 1.0     # same, with 1.0 s of silence after every line but the last
@@ -11,6 +13,8 @@
                                                             # and storyboard open with the title intro,
                                                             # and every public/demo-* file has its Demo line and frame,
                                                             # and every other frame has a scene_job;
+                                                            # and its turn headings name A or B, have text, and are
+                                                            # covered by the **Voices:** line;
                                                             # warns about words the voice may misread
 
 Standard library only. ffmpeg, ffprobe and `npx hyperframes transcribe` are reached through
@@ -36,6 +40,11 @@ VOICEOVER_RE = re.compile(r"^\s*[-*]\s+(?:voiceover|vo|voice_over|narration)\s*:
 INTRO_HEADING = re.compile(r"^#{2,3}\s+line\s+1\s+\W+\s*intro\s*\(frame\s+1\)", re.I | re.M)
 TITLE_RE = re.compile(r"^\s*[-*]\s+on_screen_title\s*:\s*(.+?)\s*$", re.I)
 MAX_INTRO_WORDS = 20
+# Discussion lines: `### Turn — A|B` headings under a line; the turn files are voice-in/NN.K.<ext>.
+TURN_HEADING = re.compile(r"^#{3}\s+turn\s+\W+\s*([AB])\s*$", re.I)
+TURN_ANY = re.compile(r"^#{3}\s+turn\b", re.I)
+VOICES_RE = re.compile(r"^\*\*Voices:\*\*\s*(.+?)\s*$", re.I | re.M)
+TURN_GAP_S = 0.3  # silence between two turns of one line
 DEMO_HEADING = re.compile(r"^#{2,3}\s+line\s+\d+\s+\W+\s*demo\s*\(frame\s+\d+\)", re.I | re.M)
 ASSETS_RE = re.compile(r"^\s*[-*]\s+asset_candidates\s*:\s*(.+?)\s*$", re.I)
 SCENE_JOBS = ("why", "change", "proof", "next")
@@ -59,6 +68,52 @@ def parse_script(md):
         if m:
             out[-1][1] = (out[-1][1] + " " + m.group(1).strip()).strip()
     return [(f, t) for f, t in out]
+
+
+def _scan_turns(md):
+    """-> ({frame: [(speaker, text), ...]}, problems). A heading that does not name A or B has speaker "?"."""
+    turns, problems, loose, frame = {}, [], set(), None
+    for line in md.splitlines():
+        h = SCRIPT_HEADING.match(line)
+        if h:
+            frame = int(h.group(1))
+            continue
+        if frame is None:
+            continue
+        t = TURN_HEADING.match(line)
+        if t or TURN_ANY.match(line):
+            if not t:
+                problems.append(f"frame {frame}: turn heading must name speaker A or B: {line.strip()}")
+            turns.setdefault(frame, []).append([t.group(1).upper() if t else "?", ""])
+            continue
+        m = SCRIPT_TEXT.match(line)
+        if m and not re.match(r"^\s*\*\*", line):
+            if frame in turns:
+                turns[frame][-1][1] = (turns[frame][-1][1] + " " + m.group(1).strip()).strip()
+            else:
+                loose.add(frame)
+    problems += [f"frame {f}: text before its first turn" for f in sorted(loose & turns.keys())]
+    problems += [f"frame {f} turn {i}: no text" for f, ts in sorted(turns.items())
+                 for i, (_, text) in enumerate(ts, 1) if not text]
+    return {f: [tuple(t) for t in ts] for f, ts in turns.items()}, problems
+
+
+def parse_turns(md):
+    """SCRIPT.md or user_script.txt -> {frame: [(speaker, text), ...]}, only for frames that have turn headings."""
+    return _scan_turns(md)[0]
+
+
+def turn_problems(md):
+    """The discussion rules the code can check: speakers, text, and a **Voices:** line that names each speaker."""
+    turns, problems = _scan_turns(md)
+    if not any(TURN_ANY.match(line) for line in md.splitlines()):
+        return problems
+    voices = VOICES_RE.search(md)
+    if not voices:
+        return problems + ["user_script.txt has turn headings but no '**Voices:** A — <voice>; B — <voice>' line"]
+    named = {x.upper() for x in re.findall(r"(?:^|;)\s*([AB])\b", voices.group(1), re.I)}
+    missing = sorted({s for ts in turns.values() for s, _ in ts} - named - {"?"})
+    return problems + ([f"turn speaker(s) {', '.join(missing)} missing from the **Voices:** line"] if missing else [])
 
 
 def narrated_frames(storyboard_md):
@@ -205,10 +260,21 @@ def risky_tokens(text, pairs=BUILTIN_RESPELLINGS):
 
 # --- the three replaceable external calls -------------------------------------------------
 
-def to_wav(src, dst, pad_s=0.0):
-    pad = ["-af", f"apad=pad_dur={pad_s}"] if pad_s > 0 else []
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-ar", "44100", "-ac", "1", *pad, str(dst)],
-                   check=True, capture_output=True, text=True)
+def to_wav(srcs, dst, pad_s=0.0):
+    """One 44.1 kHz mono WAV from the source files in order: TURN_GAP_S of silence between them, pad_s at the end."""
+    if len(srcs) == 1:
+        pad = ["-af", f"apad=pad_dur={pad_s}"] if pad_s > 0 else []
+        cmd = ["-i", str(srcs[0]), "-ar", "44100", "-ac", "1", *pad]
+    else:
+        gap = f",apad=pad_dur={TURN_GAP_S}"
+        legs = [f"[{i}:a]aformat=sample_rates=44100:channel_layouts=mono{gap if i < len(srcs) - 1 else ''}[a{i}]"
+                for i in range(len(srcs))]
+        tail = f",apad=pad_dur={pad_s}" if pad_s > 0 else ""
+        graph = ";".join(legs) + ";" + "".join(f"[a{i}]" for i in range(len(srcs))) \
+            + f"concat=n={len(srcs)}:v=0:a=1{tail}[out]"
+        cmd = [x for s in srcs for x in ("-i", str(s))] + ["-filter_complex", graph, "-map", "[out]",
+                                                          "-ar", "44100", "-ac", "1"]
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", *cmd, str(dst)], check=True, capture_output=True, text=True)
 
 
 def probe_duration(wav):
@@ -301,6 +367,44 @@ def fail(lines):
     return 1
 
 
+def voice_sources(vin, frame, k):
+    """The voice-in files of one frame, in turn order: ([files], [problems]). k = the frame's turns in the script
+    (0 = the frame is one file, voice-in/NN.<ext>; else one file per turn, voice-in/NN.K.<ext>)."""
+    nn = f"{frame:02d}"
+    plain, turns = [], {}
+    for f in vin.glob(f"{nn}.*") if vin.is_dir() else []:
+        m = re.fullmatch(rf"{nn}\.(\d+)", f.stem)
+        if f.suffix.lower() in EXTS and f.stem == nn:
+            plain.append(f)
+        elif f.suffix.lower() in EXTS and m:
+            turns.setdefault(int(m.group(1)), []).append(f)
+
+    def names(files):
+        return ", ".join(sorted(f.name for f in files))
+
+    problems = []
+    if k:
+        slots = [(f" turn {i}", f"{nn}.{i}", turns.get(i, [])) for i in range(1, k + 1)]
+        if plain:
+            problems.append(f"frame {frame}: has {names(plain)} but the script has turns")
+        beyond = [f for i, fs in turns.items() if i > k for f in fs]
+        if beyond:
+            problems.append(f"frame {frame}: turn file(s) {names(beyond)} beyond the script's {k} turns")
+    else:
+        slots = [("", nn, plain)]
+        if turns:
+            problems.append(f"frame {frame}: has turn files but no turns in the script")
+    srcs = []
+    for tag, stem, files in slots:
+        if len(files) == 1:
+            srcs += files
+        else:
+            why = "several files" if files else "missing"
+            problems.append(f"frame {frame}{tag}: {why} "
+                            f"({names(files) or '|'.join(f'voice-in/{stem}{e}' for e in EXTS)})")
+    return srcs, problems
+
+
 def adopt(p, to_wav, probe_duration, transcribe, pause_s=0.0):
     try:
         sync_script(p)
@@ -312,6 +416,7 @@ def adopt(p, to_wav, probe_duration, transcribe, pause_s=0.0):
     lines = parse_script(script.read_text())
     if not lines:
         return fail(["SCRIPT.md has no '(Frame N)' headings"])
+    turns = parse_turns(script.read_text())
     last_frame = max(f for f, _ in lines)
     problems, voices, heard_by_frame, cached = [], [], {}, 0
     (p / "assets/voice").mkdir(parents=True, exist_ok=True)
@@ -320,24 +425,22 @@ def adopt(p, to_wav, probe_duration, transcribe, pause_s=0.0):
         if not text:
             problems.append(f"frame {frame}: heading has no spoken text")
             continue
-        found = [f for f in (p / "voice-in").glob(f"{nn}.*") if f.suffix.lower() in EXTS] \
-            if (p / "voice-in").is_dir() else []
-        if len(found) != 1:
-            why = "several files" if found else "missing"
-            names = ", ".join(sorted(f.name for f in found)) or "|".join(f"voice-in/{nn}{e}" for e in EXTS)
-            problems.append(f"frame {frame}: {why} ({names})")
+        found, bad = voice_sources(p / "voice-in", frame, len(turns.get(frame, [])))
+        if bad:
+            problems += bad
             continue
+        names = ", ".join(f.name for f in found)
         dst = p / "assets/voice" / f"{nn}.wav"
         try:
-            to_wav(found[0], dst, pad_s=pause_s if frame != last_frame else 0.0)
+            to_wav(found, dst, pad_s=pause_s if frame != last_frame else 0.0)
             duration = probe_duration(dst)
             words, hit = cached_transcribe(p, dst, transcribe)
             cached += hit
         except Exception as e:  # ffmpeg, ffprobe or transcribe failed on this file
-            problems.append(f"frame {frame}: unreadable ({found[0].name}): {e}")
+            problems.append(f"frame {frame}: unreadable ({names}): {e}")
             continue
         if not words:
-            problems.append(f"frame {frame}: no words found in {found[0].name}")
+            problems.append(f"frame {frame}: no words found in {names}")
             continue
         heard_by_frame[str(frame)] = [{"text": w["text"], "start": round(w["start"], 3), "end": round(w["end"], 3)}
                                       for w in words]
@@ -401,6 +504,7 @@ def check_script(p):
     elif not 0 < len(unrespell(approved[0][1]).split()) <= MAX_INTRO_WORDS:
         # the written words: "P R" counts as the one word "PR", a hyphenated word as one
         problems.append(f"frame 1: the intro is one short sentence of at most {MAX_INTRO_WORDS} words")
+    problems += turn_problems(approved_md)
     storyboard = scripts["STORYBOARD.md"].read_text() if scripts["STORYBOARD.md"].exists() else None
     demos = sorted(f.name for f in (p / "public").glob("demo-*"))
     demo_lines = len(DEMO_HEADING.findall(approved_md))
