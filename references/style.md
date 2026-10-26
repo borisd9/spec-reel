@@ -32,7 +32,7 @@ Each one has a short bad and good version.
 ## For the voice
 
 - Spoken text is plain English at CEFR level A2, for listeners whose first language is not English: common everyday words, plain sentences, no idioms, slang or phrasal verbs with a hidden meaning. A product name or a term from the sources stays as it is, and the first time it is said, one short phrase says what it is.
-- A sentence has at most 50 words. Long sentences hurt Qwen3-TTS pacing and are hard to follow by ear.
+- A sentence has at most 30 words. Long sentences hurt Qwen3-TTS pacing and are hard to follow by ear.
 - Read each line aloud in your head. Rewrite a line that has a tongue-twister, a run of consonants or a string of numbers.
 - Spell out symbols and units the way a person says them ("about 40 percent", not "~40%").
 
