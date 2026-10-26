@@ -28,11 +28,13 @@ import shutil
 import subprocess
 import sys
 import time
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from adopt_voice import BUILTIN_RESPELLINGS, EXTS, parse_script, parse_turns, respell, sync_script, words_of  # noqa: E402
+from adopt_voice import (  # noqa: E402
+    BUILTIN_RESPELLINGS, UNKNOWN_SPEAKER, VOICE_STEM, EXTS, audio_files, parse_script, respell, scan_turns, sync_script, words_of,
+)
 
 DEFAULT_MODEL = "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16"
 CLONE_MODEL = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
@@ -40,11 +42,7 @@ DEFAULT_SPEAKER = "Aiden"
 DEFAULT_INSTRUCT = "Calm, clear and friendly, a conversational narrator explaining a product update to teammates."
 SENTENCE_GAP_S = 0.3  # the cloning path runs sentences together, so each is voiced alone and joined with this
 TEMPO_RANGE = (0.5, 2.0)  # ffmpeg atempo limits
-
-
-def audio_files(voice_in, frame):
-    """The audio files voice-in/ holds for one frame: NN.<ext>, or NN.K.<ext> for each turn of a discussion line."""
-    return [f for f in voice_in.glob(f"{frame:02d}.*") if f.suffix.lower() in EXTS]
+CLONE_VOICE = "clone"  # the voice name of the speaker of the --clone-audio recording
 
 
 def back_up(voice_in, frames, take):
@@ -64,18 +62,21 @@ def restore(project, take, frames):
         return f"voice-takes/{take} not found"
     voice_in = project / "voice-in"
     voice_in.mkdir(exist_ok=True)
-    files = sorted(f for f in src.iterdir() if f.suffix.lower() in EXTS and re.fullmatch(r"\d+(\.\d+)?", f.stem)
-                   and (not frames or int(f.stem.split(".")[0]) in frames))
+    files = []  # (file, its frame)
+    for f in sorted(src.iterdir()):
+        m = f.suffix.lower() in EXTS and VOICE_STEM.fullmatch(f.stem)
+        if m and (not frames or int(m.group(1)) in frames):
+            files.append((f, int(m.group(1))))
     if not files:
         return f"voice-takes/{take} has no audio for {' '.join(map(str, frames)) or 'any frame'}"
-    restored = sorted({int(f.stem.split(".")[0]) for f in files})
+    restored = sorted({n for _, n in files})
     now = back_up(voice_in, restored, time.strftime("%Y%m%d-%H%M%S") + "-before-restore")
     for frame in restored:  # every old file of the frame goes first, so a restored turn is never removed by its sibling
         for old in audio_files(voice_in, frame):
             old.unlink()
-    for f in files:
+    for f, n in files:
         shutil.copy2(f, voice_in / f.name)
-        print(f"restored frame {int(f.stem.split('.')[0])} <- voice-takes/{take}/{f.name}", flush=True)
+        print(f"restored frame {n} <- voice-takes/{take}/{f.name}", flush=True)
     if now.is_dir():
         print(f"the files replaced are in {now.relative_to(project)}")
     return None
@@ -100,30 +101,30 @@ def qwen_synthesizer(builtin_model, language, instruct, clone, tempo):
     import soundfile as sf
     from mlx_audio.tts.utils import load_model
 
-    load = lru_cache(maxsize=None)(load_model)
+    load = cache(load_model)
 
-    @lru_cache(maxsize=None)
+    @cache
     def reference():
         from mlx_audio.utils import load_audio
         return load_audio(str(clone[0]), sample_rate=load(CLONE_MODEL).sample_rate)
 
     def generate(text, voice):
-        if voice != "clone":
+        if voice != CLONE_VOICE:
             model = load(builtin_model)
-            return model, [r.audio for r in model.generate_custom_voice(text=text, speaker=voice, language=language, instruct=instruct)]
+            return [r.audio for r in model.generate_custom_voice(text=text, speaker=voice, language=language, instruct=instruct)], model.sample_rate
         model, parts = load(CLONE_MODEL), []
         gap = np.zeros(int(SENTENCE_GAP_S * model.sample_rate), dtype=np.float32)
         for sentence in sentences(text):  # one sentence at a time: the clone runs sentences together otherwise
             parts += [gap] if parts else []
             parts += [r.audio for r in model.generate(text=sentence, ref_audio=reference(), ref_text=clone[1])]
-        return model, parts
+        return parts, model.sample_rate
 
     def synthesize(text, out, voice):
-        model, audio = generate(text, voice)
+        audio, sample_rate = generate(text, voice)
         chunks = [np.array(c, dtype=np.float32).reshape(-1) for c in audio]
         if not chunks:
             raise RuntimeError("the model returned no audio")
-        sf.write(out, np.concatenate(chunks), model.sample_rate, subtype="PCM_16")
+        sf.write(out, np.concatenate(chunks), sample_rate, subtype="PCM_16")
         if tempo != 1.0:
             slow_down(out, tempo)
 
@@ -132,15 +133,15 @@ def qwen_synthesizer(builtin_model, language, instruct, clone, tempo):
 
 def voice_map(specs, clone, speaker):
     """--voice SPEAKER=VOICE values -> ({"A": voice, "B": voice}, error). A defaults to the clone, else --speaker."""
-    voices = {"A": "clone" if clone else speaker}
+    voices = {"A": CLONE_VOICE if clone else speaker}
     for spec in specs:
         who, _, voice = spec.partition("=")
         if not who or not voice:
             return None, f"--voice needs SPEAKER=VOICE: {spec}"
         if who.upper() not in ("A", "B"):
             return None, f"--voice speaker must be A or B: {spec}"
-        voices[who.upper()] = "clone" if voice.lower() == "clone" else voice
-    if "clone" in voices.values() and not clone:
+        voices[who.upper()] = CLONE_VOICE if voice.lower() == CLONE_VOICE else voice
+    if CLONE_VOICE in voices.values() and not clone:
         return None, "--voice ...=clone needs --clone-audio and --clone-transcript"
     return voices, None
 
@@ -150,13 +151,8 @@ def work_items(frame, text, turns, voices):
     nn = f"{frame:02d}"
     if not turns:
         return [(text, nn, voices["A"])], []
-    problems = [f"frame {frame}: text before its first turn"] if " ".join(t for _, t in turns) != text else []
-    for k, (who, t) in enumerate(turns, 1):
-        where = f"frame {frame} turn {k}"
-        if who not in voices:
-            problems.append(f"{where}: speaker must be A or B" if who == "?" else f"{where}: no voice for {who} (pass --voice {who}=...)")
-        elif not t:
-            problems.append(f"{where}: no spoken text")
+    problems = [f"frame {frame} turn {k}: no voice for {who} (pass --voice {who}=...)"
+                for k, (who, _) in enumerate(turns, 1) if who not in voices and who != UNKNOWN_SPEAKER]
     return [(t, f"{nn}.{k}", voices.get(who)) for k, (who, t) in enumerate(turns, 1)], problems
 
 
@@ -224,8 +220,9 @@ def main(argv, make_synthesizer=qwen_synthesizer):
     if not script.exists():
         print(f"SCRIPT.md not found in {a.project_dir}", file=sys.stderr)
         return 1
-    lines = dict(parse_script(script.read_text()))
-    turns = parse_turns(script.read_text())
+    md = script.read_text()
+    lines = dict(parse_script(md))
+    turns, turn_problems = scan_turns(md)
     wanted = a.frames or sorted(lines)
     if a.frames_with:
         word = words_of(a.frames_with)[:1]  # the word or its plural: "id" finds "ids" too
@@ -235,6 +232,7 @@ def main(argv, make_synthesizer=qwen_synthesizer):
             return 1
     problems = [f"frame {f}: not in SCRIPT.md" for f in wanted if f not in lines]
     problems += [f"frame {f}: heading has no spoken text" for f in wanted if f in lines and not lines[f]]
+    problems += turn_problems
     work = {}
     for frame in (f for f in wanted if f in lines and lines[f]):
         work[frame], found = work_items(frame, lines[frame], turns.get(frame), voices)

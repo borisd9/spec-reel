@@ -45,6 +45,8 @@ TURN_HEADING = re.compile(r"^#{3}\s+turn\s+\W+\s*([AB])\s*$", re.I)
 TURN_ANY = re.compile(r"^#{3}\s+turn\b", re.I)
 VOICES_RE = re.compile(r"^\*\*Voices:\*\*\s*(.+?)\s*$", re.I | re.M)
 TURN_GAP_S = 0.3  # silence between two turns of one line
+UNKNOWN_SPEAKER = "?"  # the speaker of a turn heading that names neither A nor B
+VOICE_STEM = re.compile(r"(\d+)(?:\.(\d+))?")  # voice-in file stem: frame, then the turn of a discussion line
 DEMO_HEADING = re.compile(r"^#{2,3}\s+line\s+\d+\s+\W+\s*demo\s*\(frame\s+\d+\)", re.I | re.M)
 ASSETS_RE = re.compile(r"^\s*[-*]\s+asset_candidates\s*:\s*(.+?)\s*$", re.I)
 SCENE_JOBS = ("why", "change", "proof", "next")
@@ -70,8 +72,8 @@ def parse_script(md):
     return [(f, t) for f, t in out]
 
 
-def _scan_turns(md):
-    """-> ({frame: [(speaker, text), ...]}, problems). A heading that does not name A or B has speaker "?"."""
+def scan_turns(md):
+    """-> ({frame: [(speaker, text), ...]}, problems). A heading that does not name A or B has speaker UNKNOWN_SPEAKER."""
     turns, problems, loose, frame = {}, [], set(), None
     for line in md.splitlines():
         h = SCRIPT_HEADING.match(line)
@@ -84,7 +86,7 @@ def _scan_turns(md):
         if t or TURN_ANY.match(line):
             if not t:
                 problems.append(f"frame {frame}: turn heading must name speaker A or B: {line.strip()}")
-            turns.setdefault(frame, []).append([t.group(1).upper() if t else "?", ""])
+            turns.setdefault(frame, []).append([t.group(1).upper() if t else UNKNOWN_SPEAKER, ""])
             continue
         m = SCRIPT_TEXT.match(line)
         if m and not re.match(r"^\s*\*\*", line):
@@ -100,19 +102,19 @@ def _scan_turns(md):
 
 def parse_turns(md):
     """SCRIPT.md or user_script.txt -> {frame: [(speaker, text), ...]}, only for frames that have turn headings."""
-    return _scan_turns(md)[0]
+    return scan_turns(md)[0]
 
 
 def turn_problems(md):
     """The discussion rules the code can check: speakers, text, and a **Voices:** line that names each speaker."""
-    turns, problems = _scan_turns(md)
+    turns, problems = scan_turns(md)
     if not any(TURN_ANY.match(line) for line in md.splitlines()):
         return problems
     voices = VOICES_RE.search(md)
     if not voices:
         return problems + ["user_script.txt has turn headings but no '**Voices:** A — <voice>; B — <voice>' line"]
     named = {x.upper() for x in re.findall(r"(?:^|;)\s*([AB])\b", voices.group(1), re.I)}
-    missing = sorted({s for ts in turns.values() for s, _ in ts} - named - {"?"})
+    missing = sorted({s for ts in turns.values() for s, _ in ts} - named - {UNKNOWN_SPEAKER})
     return problems + ([f"turn speaker(s) {', '.join(missing)} missing from the **Voices:** line"] if missing else [])
 
 
@@ -367,17 +369,22 @@ def fail(lines):
     return 1
 
 
+def audio_files(voice_in, frame):
+    """The audio files voice-in/ holds for one frame: NN.<ext>, or NN.K.<ext> for each turn of a discussion line."""
+    return [f for f in voice_in.glob(f"{frame:02d}.*") if f.suffix.lower() in EXTS] if voice_in.is_dir() else []
+
+
 def voice_sources(vin, frame, k):
     """The voice-in files of one frame, in turn order: ([files], [problems]). k = the frame's turns in the script
     (0 = the frame is one file, voice-in/NN.<ext>; else one file per turn, voice-in/NN.K.<ext>)."""
     nn = f"{frame:02d}"
     plain, turns = [], {}
-    for f in vin.glob(f"{nn}.*") if vin.is_dir() else []:
-        m = re.fullmatch(rf"{nn}\.(\d+)", f.stem)
-        if f.suffix.lower() in EXTS and f.stem == nn:
+    for f in audio_files(vin, frame):
+        m = VOICE_STEM.fullmatch(f.stem)
+        if m and m.group(2) is None:
             plain.append(f)
-        elif f.suffix.lower() in EXTS and m:
-            turns.setdefault(int(m.group(1)), []).append(f)
+        elif m:
+            turns.setdefault(int(m.group(2)), []).append(f)
 
     def names(files):
         return ", ".join(sorted(f.name for f in files))
@@ -413,10 +420,11 @@ def adopt(p, to_wav, probe_duration, transcribe, pause_s=0.0):
     script = p / "SCRIPT.md"
     if not script.exists():
         return fail([f"SCRIPT.md not found in {p}"])
-    lines = parse_script(script.read_text())
+    md = script.read_text()
+    lines = parse_script(md)
     if not lines:
         return fail(["SCRIPT.md has no '(Frame N)' headings"])
-    turns = parse_turns(script.read_text())
+    turns = parse_turns(md)
     last_frame = max(f for f, _ in lines)
     problems, voices, heard_by_frame, cached = [], [], {}, 0
     (p / "assets/voice").mkdir(parents=True, exist_ok=True)
