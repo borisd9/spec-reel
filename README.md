@@ -1,7 +1,5 @@
 # Spec Reel
 
-[![skills.sh](https://skills.sh/b/borisd9/spec-reel)](https://skills.sh/borisd9/spec-reel)
-
 <img width="1024" height="572" alt="Spec Reel logo" src="https://github.com/user-attachments/assets/586ad0a4-15ee-4b85-a283-3bf0f9c668e2" />
 
 An agent skill (Claude Code, Codex, Cursor and other agents that read `SKILL.md`) that turns links to plans and specs into a short narrated explainer video.
