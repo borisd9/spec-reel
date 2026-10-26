@@ -2,9 +2,11 @@
 import io
 import sys
 import tempfile
+import types
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import qwen_voice  # noqa: E402
@@ -33,15 +35,22 @@ class Fake:
     def __init__(self):
         self.loads, self.calls = 0, []
 
-    def make(self, model, speaker, language, instruct, clone, tempo):
+    def make(self, builtin_model, language, instruct, clone, tempo, voices):
         self.loads += 1
-        self.args = (model, speaker, language, instruct)
+        self.voices_needed = voices
+        self.args = (builtin_model, language, instruct)
         self.clone, self.tempo = clone, tempo
 
-        def synthesize(text, out):
-            self.calls.append(text)
+        def synthesize(text, out, voice):
+            self.calls.append((text, Path(out).name, voice))
             Path(out).write_bytes(b"RIFF" + text.encode())
         return synthesize
+
+    def texts(self):
+        return [text for text, _, _ in self.calls]
+
+    def voices(self):
+        return [(name, voice) for _, name, voice in self.calls]
 
 
 class Base(unittest.TestCase):
@@ -66,20 +75,21 @@ class QwenVoiceTests(Base):
         code, _ = self.run_main()
         self.assertEqual(code, 0)
         self.assertEqual(self.fake.loads, 1)
-        self.assertEqual(self.fake.calls, ["Hello there.", "The middle line.", "Goodbye."])
+        self.assertEqual(self.fake.texts(), ["Hello there.", "The middle line.", "Goodbye."])
         self.assertEqual(sorted(f.name for f in (self.p / "voice-in").iterdir()), ["00.wav", "01.wav", "02.wav"])
-        self.assertEqual(self.fake.args[1:3], ("Aiden", "English"))
-        self.assertEqual(self.fake.args[0], qwen_voice.DEFAULT_MODEL)
+        self.assertEqual(self.fake.args, (qwen_voice.DEFAULT_MODEL, "English", qwen_voice.DEFAULT_INSTRUCT))
+        self.assertEqual({voice for _, _, voice in self.fake.calls}, {"Aiden"})
         self.assertEqual((self.fake.clone, self.fake.tempo), (None, 1.0))
+        self.assertEqual(self.fake.voices_needed, {"Aiden"})
 
     def test_frames_option_voices_only_those(self):
         (self.p / "voice-in").mkdir()
         (self.p / "voice-in/00.wav").write_bytes(b"keep")
         code, _ = self.run_main("--frames", "1", "--speaker", "Ryan")
         self.assertEqual(code, 0)
-        self.assertEqual(self.fake.calls, ["The middle line."])
+        self.assertEqual(self.fake.texts(), ["The middle line."])
         self.assertEqual((self.p / "voice-in/00.wav").read_bytes(), b"keep")
-        self.assertEqual(self.fake.args[1], "Ryan")
+        self.assertEqual(self.fake.voices(), [("01.wav", "Ryan")])
 
     def test_replaces_a_file_of_another_format(self):
         (self.p / "voice-in").mkdir()
@@ -106,13 +116,13 @@ class QwenVoiceTests(Base):
         (self.p / "SCRIPT.md").write_text(SCRIPT.replace("The middle line.", "Two KBs here."))
         code, _ = self.run_main("--frames", "1", "--say", "KBs=K-Bs")
         self.assertEqual(code, 0)
-        self.assertEqual(self.fake.calls, ["Two K-Bs here."])
+        self.assertEqual(self.fake.texts(), ["Two K-Bs here."])
         self.assertIn("Two KBs here.", (self.p / "SCRIPT.md").read_text())
 
     def test_say_is_whole_word_only(self):
         (self.p / "SCRIPT.md").write_text(SCRIPT.replace("The middle line.", "Two KBs and a KB."))
         self.assertEqual(self.run_main("--frames", "1", "--say", "KB=kay-bee")[0], 0)
-        self.assertEqual(self.fake.calls, ["Two KBs and a kay-bee."])
+        self.assertEqual(self.fake.texts(), ["Two KBs and a kay-bee."])
 
     def test_say_without_equals_fails_before_loading_the_model(self):
         for bad in ("bad", "=x", "x="):
@@ -124,16 +134,16 @@ class QwenVoiceTests(Base):
     def test_builtin_respellings_always_apply_and_say_overrides_them(self):
         (self.p / "SCRIPT.md").write_text(SCRIPT.replace("The middle line.", "The id of the PR on v8, and ids."))
         self.assertEqual(self.run_main("--frames", "1")[0], 0)
-        self.assertEqual(self.fake.calls, ["The I-D of the P R on V-eight, and I-Ds."])
+        self.assertEqual(self.fake.texts(), ["The I-D of the P R on V-eight, and I-Ds."])
         self.fake.calls.clear()
         self.assertEqual(self.run_main("--frames", "1", "--say", "id=eye-dee")[0], 0)
-        self.assertEqual(self.fake.calls, ["The eye-dee of the P R on V-eight, and I-Ds."])
+        self.assertEqual(self.fake.texts(), ["The eye-dee of the P R on V-eight, and I-Ds."])
 
     def test_script_md_is_generated_from_user_script_txt(self):
         (self.p / "user_script.txt").write_text(SCRIPT.replace("Goodbye.", "Goodbye, ticket {{ticket}}."))
         (self.p / "facts.json").write_text('{"ticket": "412"}')
         self.assertEqual(self.run_main("--frames", "2")[0], 0)
-        self.assertEqual(self.fake.calls, ["Goodbye, ticket 412."])
+        self.assertEqual(self.fake.texts(), ["Goodbye, ticket 412."])
 
     def clone_files(self, transcript="  Exactly what I said.\n"):
         audio, text = self.p / "me.wav", self.p / "me.txt"
@@ -145,9 +155,9 @@ class QwenVoiceTests(Base):
         audio, text = self.clone_files()
         code, _ = self.run_main("--clone-audio", str(audio), "--clone-transcript", str(text))
         self.assertEqual(code, 0)
-        self.assertEqual(self.fake.args[0], qwen_voice.CLONE_MODEL)
         self.assertEqual(self.fake.clone, (audio, "Exactly what I said."))
-        self.assertEqual(self.fake.calls, ["Hello there.", "The middle line.", "Goodbye."])
+        self.assertEqual({voice for _, _, voice in self.fake.calls}, {"clone"})
+        self.assertEqual(self.fake.texts(), ["Hello there.", "The middle line.", "Goodbye."])
 
     def test_clone_paths_expand_the_home_folder(self):
         code, err = self.run_main("--clone-audio", "~/no-such-sample.wav", "--clone-transcript", "~/no-such.txt")
@@ -179,6 +189,42 @@ class QwenVoiceTests(Base):
             self.assertEqual(code, 1)
             self.assertIn("--tempo must be between 0.5 and 2.0", err)
         self.assertEqual(self.fake.loads, loads)
+
+    def test_a_factory_that_fails_leaves_every_voice_file_alone(self):
+        (self.p / "voice-in").mkdir()
+        (self.p / "voice-in/00.wav").write_bytes(b"old0")
+        (self.p / "voice-in/01.mp3").write_bytes(b"old1")
+
+        def broken(*_):
+            raise RuntimeError("model load failed")
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()), self.assertRaises(RuntimeError):
+            qwen_voice.main([str(self.p)], make_synthesizer=broken)
+        self.assertEqual(sorted(f.name for f in (self.p / "voice-in").iterdir()), ["00.wav", "01.mp3"])
+        self.assertEqual((self.p / "voice-in/00.wav").read_bytes(), b"old0")
+        self.assertFalse((self.p / "voice-takes").exists())
+
+    def test_the_real_factory_loads_every_needed_model_before_returning(self):
+        loaded, audio_loaded = [], []
+
+        def load_model(name):
+            loaded.append(name)
+            return types.SimpleNamespace(sample_rate=24000)
+
+        fakes = {
+            "numpy": types.ModuleType("numpy"), "soundfile": types.ModuleType("soundfile"),
+            "mlx_audio": types.ModuleType("mlx_audio"), "mlx_audio.tts": types.ModuleType("mlx_audio.tts"),
+            "mlx_audio.tts.utils": types.SimpleNamespace(load_model=load_model),
+            "mlx_audio.utils": types.SimpleNamespace(load_audio=lambda path, sample_rate: audio_loaded.append(path)),
+        }
+        with mock.patch.dict(sys.modules, fakes):
+            qwen_voice.qwen_synthesizer("built-in", "English", "", None, 1.0, {"Aiden", "Ryan"})
+            self.assertEqual(loaded, ["built-in"])
+            loaded.clear()
+            qwen_voice.qwen_synthesizer("built-in", "English", "", (Path("me.wav"), "hi"), 1.0, {"clone"})
+            self.assertEqual((loaded, audio_loaded), ([qwen_voice.CLONE_MODEL], ["me.wav"]))
+            loaded.clear()
+            qwen_voice.qwen_synthesizer("built-in", "English", "", (Path("me.wav"), "hi"), 1.0, {"clone", "Ryan"})
+            self.assertEqual(sorted(loaded), sorted(["built-in", qwen_voice.CLONE_MODEL]))
 
     def test_sentences_split_after_punctuation_and_a_version_stays_whole(self):
         self.assertEqual(qwen_voice.sentences("One. Two? Three: four; five!"), ["One.", "Two?", "Three:", "four;", "five!"])
@@ -262,6 +308,156 @@ class FramesWithAndTakesTests(Base):
         (self.p / "voice-takes/t1/04.wav").write_bytes(b"x")
         code, err = self.run_main("--restore", "t1", "--frames", "9")
         self.assertEqual((code, "has no audio for 9" in err), (1, True))
+
+
+DISCUSSION = """# SCRIPT
+
+**Voices:** A — Aiden; B — Ryan
+
+## Line 1 — Intro (Frame 1)
+
+    Hello there.
+
+## Line 2 — Topic (Frame 2)
+
+**Time:** 4 – 20s
+
+### Turn — A
+
+    What changed with uploads?
+
+### Turn — B
+
+    Files over 5 MB now resume. The id stays.
+
+### Turn — A
+
+    So nothing restarts.
+
+## Line 3 — Other (Frame 3)
+
+    Plain frame.
+"""
+
+
+class DiscussionTests(Base):
+    def setUp(self):
+        super().setUp()
+        (self.p / "SCRIPT.md").write_text(DISCUSSION)
+
+    def names(self):
+        return sorted(f.name for f in (self.p / "voice-in").iterdir())
+
+    def test_each_turn_is_a_file_in_its_speakers_voice_with_one_factory_call(self):
+        code, err = self.run_main("--voice", "A=Aiden", "--voice", "B=Ryan")
+        self.assertEqual((code, err), (0, ""))
+        self.assertEqual(self.fake.loads, 1)
+        self.assertEqual(self.fake.voices(), [
+            ("01.wav", "Aiden"), ("02.1.wav", "Aiden"), ("02.2.wav", "Ryan"), ("02.3.wav", "Aiden"), ("03.wav", "Aiden")])
+        self.assertEqual(self.names(), ["01.wav", "02.1.wav", "02.2.wav", "02.3.wav", "03.wav"])
+        self.assertEqual(self.fake.texts()[2], "Files over 5 MB now resume. The I-D stays.")  # respelled per turn
+
+    def test_a_plain_frame_uses_voice_a_and_a_without_voice_a_is_the_speaker_option(self):
+        self.assertEqual(self.run_main("--frames", "3", "--voice", "A=Ryan")[0], 0)
+        self.assertEqual(self.fake.voices(), [("03.wav", "Ryan")])
+        self.fake.calls.clear()
+        self.assertEqual(self.run_main("--frames", "2", "--speaker", "Serena", "--voice", "B=Ryan")[0], 0)
+        self.assertEqual(self.fake.voices(), [("02.1.wav", "Serena"), ("02.2.wav", "Ryan"), ("02.3.wav", "Serena")])
+
+    def test_a_b_turn_without_voice_b_fails_before_loading(self):
+        code, err = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2 turn 2: no voice for B (pass --voice B=...)", err)
+        self.assertEqual(self.fake.loads, 0)
+        self.assertFalse((self.p / "voice-in").exists())
+
+    def test_voice_b_is_not_needed_when_no_selected_frame_has_a_b_turn(self):
+        self.assertEqual(self.run_main("--frames", "1", "3")[0], 0)
+        self.assertEqual(self.fake.loads, 1)
+
+    def test_clone_voice_without_the_clone_flags_fails_before_loading(self):
+        for spec in ("B=clone", "A=clone", "B=Clone"):
+            code, err = self.run_main("--voice", spec)
+            self.assertEqual(code, 1)
+            self.assertIn("needs --clone-audio and --clone-transcript", err)
+        self.assertEqual(self.fake.loads, 0)
+
+    def test_a_clone_and_a_built_in_speaker_mix_in_one_run(self):
+        audio, text = self.p / "me.wav", self.p / "me.txt"
+        audio.write_bytes(b"RIFF")
+        text.write_text("What I said.")
+        args = ("--clone-audio", str(audio), "--clone-transcript", str(text))
+        self.assertEqual(self.run_main(*args, "--voice", "B=Ryan")[0], 0)
+        self.assertEqual(self.fake.loads, 1)
+        self.assertEqual(self.fake.voices()[1:4], [("02.1.wav", "clone"), ("02.2.wav", "Ryan"), ("02.3.wav", "clone")])
+        self.fake.calls.clear()
+        self.assertEqual(self.run_main(*args, "--voice", "A=Aiden", "--voice", "B=clone", "--frames", "2")[0], 0)
+        self.assertEqual([v for _, v in self.fake.voices()], ["Aiden", "clone", "Aiden"])
+
+    def test_bad_voice_options_fail_before_loading(self):
+        for bad, message in [("Ryan", "--voice needs SPEAKER=VOICE: Ryan"), ("B=", "--voice needs SPEAKER=VOICE: B="),
+                             ("C=Ryan", "--voice speaker must be A or B: C=Ryan"), ("=Ryan", "--voice needs SPEAKER=VOICE: =Ryan")]:
+            code, err = self.run_main("--voice", bad)
+            self.assertEqual(code, 1)
+            self.assertIn(message, err)
+        self.assertEqual(self.fake.loads, 0)
+
+    def test_a_turn_with_an_unknown_speaker_or_no_text_fails_before_loading(self):
+        script = DISCUSSION.replace("### Turn — B", "### Turn — C")
+        (self.p / "SCRIPT.md").write_text(script)
+        code, err = self.run_main("--voice", "B=Ryan")
+        self.assertEqual(code, 1)
+        self.assertIn("turn heading must name speaker A or B", err)
+        (self.p / "SCRIPT.md").write_text(DISCUSSION.replace("    So nothing restarts.\n", ""))
+        code, err = self.run_main("--voice", "B=Ryan")
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2 turn 3: no text", err)
+        (self.p / "SCRIPT.md").write_text(DISCUSSION.replace("**Time:** 4 – 20s\n", "**Time:** 4 – 20s\n\n    Stray text.\n"))
+        code, err = self.run_main("--voice", "B=Ryan")
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2: text before its first turn", err)
+        self.assertEqual(self.fake.loads, 0)
+
+    def test_revoicing_a_frame_backs_up_then_removes_all_its_old_files(self):
+        vin = self.p / "voice-in"
+        vin.mkdir()
+        for n in ("02.mp3", "02.1.wav", "02.2.wav", "02.3.wav", "02.4.wav", "03.wav", "20.1.wav"):
+            (vin / n).write_bytes(n.encode())
+        self.assertEqual(self.run_main("--frames", "2", "--voice", "B=Ryan")[0], 0)
+        self.assertEqual(sorted(f.name for f in vin.iterdir()), ["02.1.wav", "02.2.wav", "02.3.wav", "03.wav", "20.1.wav"])
+        self.assertNotEqual((vin / "02.1.wav").read_bytes(), b"02.1.wav")  # replaced, not left over
+        (take,) = (self.p / "voice-takes").iterdir()
+        self.assertEqual(sorted(f.name for f in take.iterdir()), ["02.1.wav", "02.2.wav", "02.3.wav", "02.4.wav", "02.mp3"])
+        self.assertEqual((take / "02.2.wav").read_bytes(), b"02.2.wav")
+
+    def test_a_script_with_one_frame_going_from_plain_to_turns_drops_the_plain_file(self):
+        vin = self.p / "voice-in"
+        vin.mkdir()
+        (vin / "02.wav").write_bytes(b"old plain")
+        self.assertEqual(self.run_main("--frames", "2", "--voice", "B=Ryan")[0], 0)
+        self.assertEqual(self.names(), ["02.1.wav", "02.2.wav", "02.3.wav"])
+
+    def test_restore_puts_back_turn_files_of_a_frame_and_keeps_the_ones_it_replaces(self):
+        take = self.p / "voice-takes/t1"
+        take.mkdir(parents=True)
+        for n in ("02.1.wav", "02.2.wav", "02.3.wav", "03.wav"):
+            (take / n).write_bytes(b"take " + n.encode())
+        vin = self.p / "voice-in"
+        vin.mkdir()
+        (vin / "02.wav").write_bytes(b"plain")
+        (vin / "02.4.wav").write_bytes(b"extra")
+        self.assertEqual(self.run_main("--restore", "t1", "--frames", "2")[0], 0)
+        self.assertEqual(sorted(f.name for f in vin.iterdir()), ["02.1.wav", "02.2.wav", "02.3.wav"])
+        self.assertEqual((vin / "02.3.wav").read_bytes(), b"take 02.3.wav")
+        (saved,) = [t for t in (self.p / "voice-takes").iterdir() if t.name != "t1"]
+        self.assertEqual(sorted(f.name for f in saved.iterdir()), ["02.4.wav", "02.wav"])
+        self.assertEqual(self.run_main("--restore", "t1")[0], 0)
+        self.assertEqual(sorted(f.name for f in vin.iterdir()), ["02.1.wav", "02.2.wav", "02.3.wav", "03.wav"])
+        self.assertEqual(self.fake.loads, 0)
+
+    def test_frames_with_picks_a_discussion_frame_and_voices_all_its_turns(self):
+        self.assertEqual(self.run_main("--frames-with", "resume", "--voice", "B=Ryan")[0], 0)
+        self.assertEqual(self.names(), ["02.1.wav", "02.2.wav", "02.3.wav"])
 
 
 if __name__ == "__main__":
