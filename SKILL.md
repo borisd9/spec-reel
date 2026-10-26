@@ -44,8 +44,8 @@ Run folders are never deleted.
 1. The links or files of the plans and specs to explain (one or more).
 2. The audience and the intent (what the viewer should know or do afterwards).
 3. The target length [60-90 seconds, a team update].
-4. The voice: Qwen3-TTS built-in speaker [config `voice_source`, default], your cloned voice, or your own TTS engine.
-5. The format: narration, one voice [default], or discussion, two voices (A and B) talking. When the user picks discussion, ask in the same message which voice each speaker uses: a built-in speaker (`Aiden`, `Ryan`), the cloned voice, or the user's own engine for both. There is no default pair, and this answer replaces question 4. A built-in speaker and the clone may be mixed; the own engine is all-or-nothing.
+4. The voice for a narration: Qwen3-TTS built-in speaker [config `voice_source`, default], your cloned voice, or your own TTS engine.
+5. The format: narration, one voice [default], or discussion, two voices (A and B) talking. When the user picks discussion, ask as a follow-up which voice each speaker uses: a built-in speaker (`Aiden`, `Ryan`), the cloned voice, or the user's own engine for both. There is no default pair, and this answer replaces question 4. A built-in speaker and the clone may be mixed; the own engine is all-or-nothing. Voicing always passes both `--voice A=<voice>` and `--voice B=<voice>`, with `<voice>` one of `Aiden`, `Ryan` (case as written) or `clone`.
 
 When the user picks the cloned voice (for either speaker): if `qwen_clone_audio` or `qwen_clone_transcript` is empty, ask for both paths in one message and save them to `config.json`. The first time a sample is used, ask once whether it is the user's own voice or used with the speaker's permission; if not, use the default voice instead. Then check that both files exist; when one is missing, name it and offer the default voice.
 
@@ -69,8 +69,8 @@ stage: sources            # sources | digest | script | scenes | done
 - intent: ...
 - length: ...
 - target: <seconds, or a range like 60-90; yolo: 75>
-- voice source: qwen (speaker) | clone | own   tempo: <qwen_tempo>   (own: whether a tts_command was used, never its text)
-- format: narration | discussion (A: <voice>, B: <voice>)
+- voice source: qwen (speaker) | clone | own | discussion   tempo: <qwen_tempo>   (own: whether a tts_command was used, never its text)
+- format: narration | discussion (A: Aiden|Ryan|clone|own, B: Aiden|Ryan|clone|own)   (a resume rebuilds the `--voice` flags from this)
 - pause: <slide_pause_s>s   captions: off | on
 - mode: interactive | yolo
 
@@ -123,9 +123,9 @@ Set `stage: script`.
 Write `user_script.txt` at the run folder root. It is the only script file you edit: `SCRIPT.md` is generated from it. Write numbers, names and acronyms in their written form ("PR 12", "v8", "ids"): the voice respells them (`references/handoff.md` § Pronunciation). A fact that repeats across the video goes in `facts.json` and is written `{{key}}` (§ Facts). The format:
 
 - header line `**Voice:**` naming "Qwen3-TTS · <config qwen_speaker>", "Qwen3-TTS · cloned voice", or "your own engine" for the own source; in a discussion, `**Voices:** A — <voice>; B — <voice>` instead, each voice named the same way;
-- one section per spoken line: `## Line N — <label> (Frame N)`, then `**Time:**`, then `**Delivery:**`, then the spoken text indented four spaces;
+- one section per spoken line: `## Line N — <label> (Frame N)`, then `**Time:**`, then `**Delivery:**`, then the spoken text indented four spaces; in a discussion line `**Time:**` and `**Delivery:**` come right after the line heading, before the first turn;
 - the first line is always the intro, `## Line 1 — Intro (Frame 1)`: one short sentence (at most 20 words) saying what this video is about, for example "This is a quick tour of the new upload flow and what it means for your team." Its scene shows the approved title. The user may reword the intro but not remove it;
-- with a demo, one `## Line N — Demo (Frame N)` line per demo file, in the "what it changes" part, describing what the viewer sees on it (`references/demo.md`); without one, no Demo line;
+- with a demo, one `## Line N — Demo (Frame N)` line per demo file, in the "what it changes" part, describing what the viewer sees on it (`references/demo.md`); in a discussion it has no turn heading and A speaks it; without a demo, no Demo line;
 - Line N and Frame N carry the same number, counting up one per line from 1;
 - total length within the target length: the words at about 150 words per minute, plus `slide_pause_s` after every line but the last (in a discussion, also `TURN_GAP_S` (`scripts/adopt_voice.py`, 0.3 s) between the turns of a line);
 - spoken text is plain English at CEFR level A2 (`references/style.md` § For the voice);

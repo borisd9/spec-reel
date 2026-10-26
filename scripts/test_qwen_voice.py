@@ -2,9 +2,11 @@
 import io
 import sys
 import tempfile
+import types
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import qwen_voice  # noqa: E402
@@ -33,8 +35,9 @@ class Fake:
     def __init__(self):
         self.loads, self.calls = 0, []
 
-    def make(self, builtin_model, language, instruct, clone, tempo):
+    def make(self, builtin_model, language, instruct, clone, tempo, voices):
         self.loads += 1
+        self.voices_needed = voices
         self.args = (builtin_model, language, instruct)
         self.clone, self.tempo = clone, tempo
 
@@ -77,6 +80,7 @@ class QwenVoiceTests(Base):
         self.assertEqual(self.fake.args, (qwen_voice.DEFAULT_MODEL, "English", qwen_voice.DEFAULT_INSTRUCT))
         self.assertEqual({voice for _, _, voice in self.fake.calls}, {"Aiden"})
         self.assertEqual((self.fake.clone, self.fake.tempo), (None, 1.0))
+        self.assertEqual(self.fake.voices_needed, {"Aiden"})
 
     def test_frames_option_voices_only_those(self):
         (self.p / "voice-in").mkdir()
@@ -185,6 +189,42 @@ class QwenVoiceTests(Base):
             self.assertEqual(code, 1)
             self.assertIn("--tempo must be between 0.5 and 2.0", err)
         self.assertEqual(self.fake.loads, loads)
+
+    def test_a_factory_that_fails_leaves_every_voice_file_alone(self):
+        (self.p / "voice-in").mkdir()
+        (self.p / "voice-in/00.wav").write_bytes(b"old0")
+        (self.p / "voice-in/01.mp3").write_bytes(b"old1")
+
+        def broken(*_):
+            raise RuntimeError("model load failed")
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()), self.assertRaises(RuntimeError):
+            qwen_voice.main([str(self.p)], make_synthesizer=broken)
+        self.assertEqual(sorted(f.name for f in (self.p / "voice-in").iterdir()), ["00.wav", "01.mp3"])
+        self.assertEqual((self.p / "voice-in/00.wav").read_bytes(), b"old0")
+        self.assertFalse((self.p / "voice-takes").exists())
+
+    def test_the_real_factory_loads_every_needed_model_before_returning(self):
+        loaded, audio_loaded = [], []
+
+        def load_model(name):
+            loaded.append(name)
+            return types.SimpleNamespace(sample_rate=24000)
+
+        fakes = {
+            "numpy": types.ModuleType("numpy"), "soundfile": types.ModuleType("soundfile"),
+            "mlx_audio": types.ModuleType("mlx_audio"), "mlx_audio.tts": types.ModuleType("mlx_audio.tts"),
+            "mlx_audio.tts.utils": types.SimpleNamespace(load_model=load_model),
+            "mlx_audio.utils": types.SimpleNamespace(load_audio=lambda path, sample_rate: audio_loaded.append(path)),
+        }
+        with mock.patch.dict(sys.modules, fakes):
+            qwen_voice.qwen_synthesizer("built-in", "English", "", None, 1.0, {"Aiden", "Ryan"})
+            self.assertEqual(loaded, ["built-in"])
+            loaded.clear()
+            qwen_voice.qwen_synthesizer("built-in", "English", "", (Path("me.wav"), "hi"), 1.0, {"clone"})
+            self.assertEqual((loaded, audio_loaded), ([qwen_voice.CLONE_MODEL], ["me.wav"]))
+            loaded.clear()
+            qwen_voice.qwen_synthesizer("built-in", "English", "", (Path("me.wav"), "hi"), 1.0, {"clone", "Ryan"})
+            self.assertEqual(sorted(loaded), sorted(["built-in", qwen_voice.CLONE_MODEL]))
 
     def test_sentences_split_after_punctuation_and_a_version_stays_whole(self):
         self.assertEqual(qwen_voice.sentences("One. Two? Three: four; five!"), ["One.", "Two?", "Three:", "four;", "five!"])

@@ -18,8 +18,8 @@ hold exactly what the recording says (--speaker is then ignored unless --voice n
 voice; a line without turn headings stays voice-in/NN.wav in A's voice. Without --voice A, A is the clone when the clone
 flags are given, else --speaker. A B turn needs --voice B. --frames re-voices every turn of the frame.
 --tempo slows (below 1) or speeds the voice with ffmpeg, without changing pitch; --speed does nothing for Qwen3-TTS.
-Needs an Apple Silicon Mac. Each model downloads once (about 4 GB) into the Hugging Face cache; a model loads
-only when a built-in speaker (--model overrides it) or the clone is first used.
+Needs an Apple Silicon Mac. Each model downloads once (about 4 GB) into the Hugging Face cache; every model the
+run's voices need (the built-in model, --model overrides it; the clone) loads once, before any voice file is replaced.
 """
 import argparse
 import os
@@ -28,7 +28,6 @@ import shutil
 import subprocess
 import sys
 import time
-from functools import cache
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -94,30 +93,30 @@ def slow_down(out, tempo):
     os.replace(tmp, out)
 
 
-def qwen_synthesizer(builtin_model, language, instruct, clone, tempo):
+def qwen_synthesizer(builtin_model, language, instruct, clone, tempo, voices):
     """Return synthesize(text, out_path, voice); voice is a built-in speaker name or "clone" (clone = (audio, transcript)).
-    The built-in model (builtin_model) loads on the first built-in speaker, CLONE_MODEL on the first clone item."""
+    Every model the run's voices need (builtin_model for a built-in speaker, CLONE_MODEL and the reference recording for
+    the clone) loads here, before this returns, so a failed load happens before any voice file is replaced."""
     import numpy as np
     import soundfile as sf
     from mlx_audio.tts.utils import load_model
 
-    load = cache(load_model)
-
-    @cache
-    def reference():
+    builtin = load_model(builtin_model) if voices - {CLONE_VOICE} else None
+    clone_model, reference = None, None
+    if CLONE_VOICE in voices:
         from mlx_audio.utils import load_audio
-        return load_audio(str(clone[0]), sample_rate=load(CLONE_MODEL).sample_rate)
+        clone_model = load_model(CLONE_MODEL)
+        reference = load_audio(str(clone[0]), sample_rate=clone_model.sample_rate)
 
     def generate(text, voice):
         if voice != CLONE_VOICE:
-            model = load(builtin_model)
-            return [r.audio for r in model.generate_custom_voice(text=text, speaker=voice, language=language, instruct=instruct)], model.sample_rate
-        model, parts = load(CLONE_MODEL), []
-        gap = np.zeros(int(SENTENCE_GAP_S * model.sample_rate), dtype=np.float32)
+            return [r.audio for r in builtin.generate_custom_voice(text=text, speaker=voice, language=language, instruct=instruct)], builtin.sample_rate
+        parts = []
+        gap = np.zeros(int(SENTENCE_GAP_S * clone_model.sample_rate), dtype=np.float32)
         for sentence in sentences(text):  # one sentence at a time: the clone runs sentences together otherwise
             parts += [gap] if parts else []
-            parts += [r.audio for r in model.generate(text=sentence, ref_audio=reference(), ref_text=clone[1])]
-        return parts, model.sample_rate
+            parts += [r.audio for r in clone_model.generate(text=sentence, ref_audio=reference, ref_text=clone[1])]
+        return parts, clone_model.sample_rate
 
     def synthesize(text, out, voice):
         audio, sample_rate = generate(text, voice)
@@ -241,7 +240,8 @@ def main(argv, make_synthesizer=qwen_synthesizer):
         print("\n".join(problems), file=sys.stderr)
         return 1
 
-    synthesize = make_synthesizer(a.model or DEFAULT_MODEL, a.language, a.instruct, clone, a.tempo)
+    needed = {voice for items in work.values() for _, _, voice in items}
+    synthesize = make_synthesizer(a.model or DEFAULT_MODEL, a.language, a.instruct, clone, a.tempo, needed)  # loads every model
     voice_in = a.project_dir / "voice-in"
     voice_in.mkdir(exist_ok=True)
     take = back_up(voice_in, wanted, time.strftime("%Y%m%d-%H%M%S"))
