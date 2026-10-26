@@ -37,7 +37,7 @@ Also stop when `npx hyperframes check --help` fails: the layout check and the st
 
 ## STORYBOARD.md
 
-Write it into the run folder after `init`. Shape per `<hyperframes dir>/references/storyboard-format.md`. One frame per line of `user_script.txt`, in the same order, with the same spoken words (`voiceover`). Labels, `Time` and `Delivery` may change, except that Line 1 stays labeled `Intro`.
+Write it into the run folder after `init`. Shape per `<hyperframes dir>/references/storyboard-format.md`. One frame per line of `user_script.txt`, in the same order, with the same spoken words (`voiceover`). In a discussion, a frame's `voiceover` is the joined text of its turns, in order. Labels, `Time` and `Delivery` may change, except that Line 1 stays labeled `Intro`.
 
 ```markdown
 ---
@@ -79,7 +79,7 @@ Run it right after gate 2 and again once `STORYBOARD.md` exists:
 python3 -I <this skill's directory>/scripts/adopt_voice.py . --check-script
 ```
 
-It regenerates `SCRIPT.md` from `user_script.txt` (see Facts below), then fails when the script does not open with `## Line 1 — Intro (Frame 1)`, when that line is longer than 20 written words, when a `public/demo-*` file has no Demo line, and, once `STORYBOARD.md` exists, when Frame 1 has no `on_screen_title`, a demo file has no frame naming it, or a frame other than the intro and the Demo frames has no `scene_job` (or a `change` frame has no `before` and `after`). It also **warns** (it does not fail) about words the voice may misread: identifiers with `_` or a hyphen and a digit, digits stuck to letters, lowercase acronyms. For each warning, reword the line or add a respelling (below). When it fails:
+It regenerates `SCRIPT.md` from `user_script.txt` (see Facts below), then fails when a turn heading does not name `A` or `B`, a turn has no text, text sits before a line's first turn, or turn headings exist and the `**Voices:**` header is missing or leaves out a speaker (alternation and the 2 to 6 turns are style rules you check, not code checks). It also fails when the script does not open with `## Line 1 — Intro (Frame 1)`, when that line is longer than 20 written words, when a `public/demo-*` file has no Demo line, and, once `STORYBOARD.md` exists, when Frame 1 has no `on_screen_title`, a demo file has no frame naming it, or a frame other than the intro and the Demo frames has no `scene_job` (or a `change` frame has no `before` and `after`). It also **warns** (it does not fail) about words the voice may misread: identifiers with `_` or a hyphen and a digit, digits stuck to letters, lowercase acronyms. For each warning, reword the line or add a respelling (below). When it fails:
 
 - a missing or empty `on_screen_title` is fixed by writing the approved title into Frame 1;
 - a demo file with no frame naming it is fixed by adding its `asset_candidates` line to its Demo frame; a missing Demo line re-opens gate 2;
@@ -122,7 +122,7 @@ Record `claim check: <lines checked> lines, fixed <frame ids | none>` under `## 
 
 ## Voicing
 
-Both voice sources end the same way: one audio file per script line in `voice-in/`, then `adopt_voice.py`.
+Both voice sources end the same way: one audio file per script line in `voice-in/`, then `adopt_voice.py`. In a discussion, a line with turn headings has one file per turn, `voice-in/NN.K.<ext>` (K = 1, 2, ... in script order, no plain `NN` file next to them); a line without turn headings keeps `voice-in/NN.<ext>`.
 
 ### Pronunciation
 
@@ -139,7 +139,9 @@ uv run -q --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
 
 When the run's voice source is `clone`, add `--clone-audio "<config qwen_clone_audio>" --clone-transcript "<config qwen_clone_transcript>"` (then `--speaker` and `--instruct` are not needed): the lines are voiced in the speaker of that recording, one sentence at a time with a short pause between them. Add `--tempo <config qwen_tempo>` when it is not `1.0`: it slows (below 1) or speeds the voice after generation, without changing pitch.
 
-Append `--say <written>=<spoken>` for each entry of config `pronunciations`. Add `--instruct "<config qwen_instruct>"` when that value is set; when it is empty the script uses a calm, conversational narrator. The first run downloads the model (about 4 GB) into the Hugging Face cache; later runs load it in seconds. It writes `voice-in/NN.wav` for every line, or only the lines named with `--frames <N...>` or `--frames-with <word>` (the frames whose spoken text has that word or its plural; pick frames by word, never by grep line numbers).
+**Discussion.** Add `--voice A=<voice> --voice B=<voice>`, where `<voice>` is a built-in speaker name (`Aiden`, `Ryan`) or `clone` (it needs the clone flags above). Each turn is voiced in its speaker's voice into `voice-in/NN.K.wav`. A line without turn headings is voiced in A's voice into `voice-in/NN.wav`. Without `--voice A`, A is the clone when the clone flags are given, else `--speaker`. A B turn with no `--voice B` fails before any model loads. A built-in speaker and the clone can mix in one run; each model loads once, when first used. `--frames` and `--frames-with` re-voice every turn of a frame, and `--restore` puts back all of its turn files.
+
+Append `--say <written>=<spoken>` for each entry of config `pronunciations`. Add `--instruct "<config qwen_instruct>"` when that value is set; when it is empty the script uses a calm, conversational narrator. The first run downloads the model (about 4 GB) into the Hugging Face cache; later runs load it in seconds. It writes `voice-in/NN.wav` for every line (`NN.K.wav` for each turn of a discussion line), or only the lines named with `--frames <N...>` or `--frames-with <word>` (the frames whose spoken text has that word or its plural; pick frames by word, never by grep line numbers).
 
 Before it replaces a file it copies it into `voice-takes/<timestamp>/`. `--restore <timestamp> --frames <N...>` puts a take back (without `--frames`, every file in it); the file it replaces is saved too. Never delete `voice-takes/`.
 
@@ -147,9 +149,9 @@ When it fails because the Mac is not Apple Silicon or MLX-Audio cannot load, sto
 
 ### The user's own engine
 
-1. Parse the final `SCRIPT.md` and show the user each line as: frame number, spoken text, target file `voice-in/NN.<ext>` (`NN` is the two-digit frame number; `<ext>` is `wav`, `mp3`, `m4a` or `aiff`).
+1. Parse the final `SCRIPT.md` and show the user each line as: frame number, spoken text, target file `voice-in/NN.<ext>` (`NN` is the two-digit frame number; `<ext>` is `wav`, `mp3`, `m4a` or `aiff`). For a discussion line, show each turn with its speaker and its target file `voice-in/NN.K.<ext>`.
 2. Get the audio.
-   - **The user names a TTS command** (or the config `tts_command` is set; a command named at run time overrides it for that run): write each line's text to a temp file and run the command once per line, one line at a time. `{text_file}` becomes that temp file and `{out}` becomes `voice-in/NN` with no extension; the command supplies its own extension, for example `say -v Samantha -f {text_file} -o {out}.aiff`. Spoken text reaches the command only through `{text_file}`, never inline. A command without both placeholders is completed by asking the user, never by putting the text inline. A command never contains a credential: it reads any key itself from an environment variable or a file outside the skill folder. Record in `RUN.md` only that a command was used, never its text.
+   - **The user names a TTS command** (or the config `tts_command` is set; a command named at run time overrides it for that run): write each line's text to a temp file and run the command once per line, one line at a time. `{text_file}` becomes that temp file and `{out}` becomes `voice-in/NN` with no extension; the command supplies its own extension, for example `say -v Samantha -f {text_file} -o {out}.aiff`. In a discussion the command runs once per turn, `{out}` becomes `voice-in/NN.K`, and `{speaker}` becomes `A` or `B` (a command without `{speaker}` cannot voice two speakers: the user drops the turn files instead). Spoken text reaches the command only through `{text_file}`, never inline. A command without both placeholders is completed by asking the user, never by putting the text inline. A command never contains a credential: it reads any key itself from an environment variable or a file outside the skill folder. Record in `RUN.md` only that a command was used, never its text.
    - **Otherwise** wait for the user to drop one file per line into `voice-in/`.
 
 ### Adopt (both sources)
@@ -160,7 +162,7 @@ From the project folder run:
 python3 -I <this skill's directory>/scripts/adopt_voice.py . --pause <config slide_pause_s>
 ```
 
-It writes `SCRIPT.md` from `user_script.txt`, converts each file to `assets/voice/NN.wav` (44.1 kHz mono), reads its length, gets word timings with `npx hyperframes transcribe`, and writes `audio_meta.json` and `audio_engine_meta.json`. A transcript is remembered by the converted WAV's SHA-256 in `voice-cache/<sha>.json`, so a re-run transcribes only the files that changed. It exits non-zero and lists the lines with a missing file, several files, an unreadable file, or no words; no meta file is written then. A re-run keeps any `bgm`, `sfx` and host entries already in the meta files and replaces only `voices`. It writes the script's own words onto the transcript timings, so captions and cues read as scripted, and lists any line where the transcript differs in a way a listener would hear (the transcript is saved in `voice_heard.json`).
+It writes `SCRIPT.md` from `user_script.txt`, converts each file to `assets/voice/NN.wav` (44.1 kHz mono; the turn files of a discussion line are joined in order into one WAV, with `TURN_GAP_S`, 0.3 s, of silence between turns), reads its length, gets word timings with `npx hyperframes transcribe`, and writes `audio_meta.json` and `audio_engine_meta.json`. A transcript is remembered by the converted WAV's SHA-256 in `voice-cache/<sha>.json`, so a re-run transcribes only the files that changed. It exits non-zero and lists the lines with a missing file, several files, an unreadable file, or no words (for a discussion line it names the turn, for example `frame 3 turn 2: missing`, and it refuses a plain file next to turn files, or turn files for a line with no turns); no meta file is written then. A re-run keeps any `bgm`, `sfx` and host entries already in the meta files and replaces only `voices`. It writes the script's own words onto the transcript timings, so captions and cues read as scripted, and lists any line where the transcript differs in a way a listener would hear (the transcript is saved in `voice_heard.json`).
 
 ## Speech check (Qwen3-TTS)
 
@@ -174,7 +176,7 @@ python3 -I <this skill's directory>/scripts/adopt_voice.py . --check
 
 It confirms that every frame whose storyboard `voiceover` is non-empty has a voice entry in `audio_meta.json` with an existing WAV and a non-empty `words` list. Silent frames are skipped. `finish.py` runs it; run it by hand after any re-voice.
 
-**On failure:** stop before building. Say: "These scenes have no voice or word timings: <frame list>. Voice source: <Qwen3-TTS | cloned voice | your own engine>." Then offer the other voice source: the default Qwen3-TTS speaker when the clone failed, the user's own engine when Qwen3-TTS failed. On yes: record the new source in `RUN.md`, delete `audio_meta.json`, `audio_engine_meta.json`, `voice-in/`, `voice-cache/` and `assets/voice/`, and continue from the voicing step with the new source. A run never mixes sources.
+**On failure:** stop before building. Say: "These scenes have no voice or word timings: <frame list>. Voice source: <Qwen3-TTS | cloned voice | your own engine>." Then offer the other voice source: the default Qwen3-TTS speaker when the clone failed, the user's own engine when Qwen3-TTS failed. On yes: record the new source in `RUN.md`, delete `audio_meta.json`, `audio_engine_meta.json`, `voice-in/`, `voice-cache/` and `assets/voice/`, and continue from the voicing step with the new source. A run never mixes Qwen3-TTS and the user's own engine.
 
 ## Review and render: `finish.py`
 
@@ -216,4 +218,4 @@ A change request at the preview rebuilds only the scenes the user names, plus an
 3. Record the re-opened gate 1 in `RUN.md` under `## Approvals`: the time and the new SHA-256 (interactive: the user approves the extended digest; yolo: `auto (yolo)`).
 4. Rewrite the affected script lines (gate 2 re-opens for them), re-voice them, rebuild the scenes, run the claim check on the changed frames.
 
-Every voice generation in a run, including re-voicing, goes through the run's chosen voice source. A run never mixes the two sources.
+Every voice generation in a run, including re-voicing, goes through the run's chosen voice source. A run never mixes Qwen3-TTS and the user's own engine (a built-in speaker and the clone may share a discussion).

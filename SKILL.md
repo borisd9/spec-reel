@@ -1,6 +1,6 @@
 ---
 name: spec-reel
-description: "Turn links to plans and specs into a short narrated explainer video. Asks for the sources, audience and length, reads them into an approved digest, picks a demo mock or recording when one exists, writes an approved timestamped script with a title intro, voices it locally with Qwen3-TTS (or the user's own TTS), then builds one synced scene per line with the HyperFrames explainer route and renders an MP4. Use for requests like 'make a video explaining this plan', 'turn these specs into a narrated update video', 'short video of what this feature changes', 'explainer video from these docs for the team'. For a single document with no review gates or own-voice option, the hyperframes skill alone is enough."
+description: "Turn links to plans and specs into a short narrated explainer video. Asks for the sources, audience and length, reads them into an approved digest, picks a demo mock or recording when one exists, writes an approved timestamped script with a title intro, voices it locally with Qwen3-TTS (or the user's own TTS), as one narrator or as a two-voice discussion, then builds one synced scene per line with the HyperFrames explainer route and renders an MP4. Use for requests like 'make a video explaining this plan', 'turn these specs into a narrated update video', 'short video of what this feature changes', 'explainer video from these docs for the team'. For a single document with no review gates or own-voice option, the hyperframes skill alone is enough."
 argument-hint: "[--yolo] links or paths to plans and specs"
 ---
 
@@ -23,7 +23,7 @@ Config lives in `<this skill's directory>/config.json`, which is never committed
 1. When `config.json` is missing, copy `config.example.json` to `config.json`.
 2. When a value is empty where it is required (`output_root`, `style_preset`, `voice_source`), ask for all the missing ones in one batch, write them to `config.json`, and continue. Later runs ask nothing about setup.
 3. `voice_source` is `qwen` (Qwen3-TTS on this Mac, the default), `own` (the user's own engine) or `clone` (the user's cloned voice, opt-in: never choose it unless the user picks it). `qwen_speaker` defaults to `Aiden` (`Ryan` is the other English voice). `qwen_instruct` (empty means a calm, conversational narrator) and `tts_command` (empty means the user drops audio files) may stay empty. `qwen_clone_audio` and `qwen_clone_transcript` (paths to a recording and to a file with its exact transcript, `~` allowed) are empty until the user picks the clone; setting them does not select it. `qwen_tempo` (default `1.0`, `0.5` to `2.0`, below 1 is slower) slows any Qwen3-TTS voice without changing pitch. `slide_pause_s` (default `1.0`, seconds of silence after every line but the last), `captions` (`off` default, or `on`) and `pronunciations` (respellings for Qwen3-TTS, for example `{"KBs": "K-Bs"}`) may stay at their defaults.
-4. `tts_command` uses `{text_file}` and `{out}` placeholders (see `references/handoff.md`) and never contains a credential. When asked to save a command that contains a key-like literal (a token, key or password), refuse and ask for the form where the command reads the key from an environment variable or a file outside this folder.
+4. `tts_command` uses `{text_file}` and `{out}` placeholders, and `{speaker}` in a discussion (see `references/handoff.md`) and never contains a credential. When asked to save a command that contains a key-like literal (a token, key or password), refuse and ask for the form where the command reads the key from an environment variable or a file outside this folder.
 
 ## Start or resume
 
@@ -45,8 +45,9 @@ Run folders are never deleted.
 2. The audience and the intent (what the viewer should know or do afterwards).
 3. The target length [60-90 seconds, a team update].
 4. The voice: Qwen3-TTS built-in speaker [config `voice_source`, default], your cloned voice, or your own TTS engine.
+5. The format: narration, one voice [default], or discussion, two voices (A and B) talking. When the user picks discussion, ask in the same message which voice each speaker uses: a built-in speaker (`Aiden`, `Ryan`), the cloned voice, or the user's own engine for both. There is no default pair, and this answer replaces question 4. A built-in speaker and the clone may be mixed; the own engine is all-or-nothing.
 
-When the user picks the cloned voice: if `qwen_clone_audio` or `qwen_clone_transcript` is empty, ask for both paths in one message and save them to `config.json`. The first time a sample is used, ask once whether it is the user's own voice or used with the speaker's permission; if not, use the default voice instead. Then check that both files exist; when one is missing, name it and offer the default voice.
+When the user picks the cloned voice (for either speaker): if `qwen_clone_audio` or `qwen_clone_transcript` is empty, ask for both paths in one message and save them to `config.json`. The first time a sample is used, ask once whether it is the user's own voice or used with the speaker's permission; if not, use the default voice instead. Then check that both files exist; when one is missing, name it and offer the default voice.
 
 Then check that the files this skill needs exist ("Files this skill needs" in `references/handoff.md`). Then, from the folder that will contain the run folder:
 
@@ -69,6 +70,7 @@ stage: sources            # sources | digest | script | scenes | done
 - length: ...
 - target: <seconds, or a range like 60-90; yolo: 75>
 - voice source: qwen (speaker) | clone | own   tempo: <qwen_tempo>   (own: whether a tts_command was used, never its text)
+- format: narration | discussion (A: <voice>, B: <voice>)
 - pause: <slide_pause_s>s   captions: off | on
 - mode: interactive | yolo
 
@@ -120,21 +122,23 @@ Set `stage: script`.
 
 Write `user_script.txt` at the run folder root. It is the only script file you edit: `SCRIPT.md` is generated from it. Write numbers, names and acronyms in their written form ("PR 12", "v8", "ids"): the voice respells them (`references/handoff.md` § Pronunciation). A fact that repeats across the video goes in `facts.json` and is written `{{key}}` (§ Facts). The format:
 
-- header line `**Voice:**` naming "Qwen3-TTS · <config qwen_speaker>", "Qwen3-TTS · cloned voice", or "your own engine" for the own source;
+- header line `**Voice:**` naming "Qwen3-TTS · <config qwen_speaker>", "Qwen3-TTS · cloned voice", or "your own engine" for the own source; in a discussion, `**Voices:** A — <voice>; B — <voice>` instead, each voice named the same way;
 - one section per spoken line: `## Line N — <label> (Frame N)`, then `**Time:**`, then `**Delivery:**`, then the spoken text indented four spaces;
 - the first line is always the intro, `## Line 1 — Intro (Frame 1)`: one short sentence (at most 20 words) saying what this video is about, for example "This is a quick tour of the new upload flow and what it means for your team." Its scene shows the approved title. The user may reword the intro but not remove it;
 - with a demo, one `## Line N — Demo (Frame N)` line per demo file, in the "what it changes" part, describing what the viewer sees on it (`references/demo.md`); without one, no Demo line;
 - Line N and Frame N carry the same number, counting up one per line from 1;
-- total length within the target length: the words at about 150 words per minute, plus `slide_pause_s` after every line but the last;
+- total length within the target length: the words at about 150 words per minute, plus `slide_pause_s` after every line but the last (in a discussion, also `TURN_GAP_S` (`scripts/adopt_voice.py`, 0.3 s) between the turns of a line);
+- spoken text is plain English at CEFR level A2 (`references/style.md` § For the voice);
 - spoken text uses only points from the approved digest;
-- a point tagged `[in progress]` or `[planned]` is spoken in the future tense ("will", "is being built"), never as done; only `[shipped]` points are spoken in the past or present tense.
+- a point tagged `[in progress]` or `[planned]` is spoken in the future tense ("will", "is being built"), never as done; only `[shipped]` points are spoken in the past or present tense;
+- in a discussion, a line is a topic and stays one scene. Under its heading come the turns, each a `### Turn — A` or `### Turn — B` heading and then the turn's text indented four spaces. A line with no turn heading is one turn spoken by A, so the intro needs none. Turn style rules (count, alternation, who hosts) are in `references/style.md` § Discussion lines.
 
 Before showing the script, check it against `references/style.md` and fix what fails, then run `adopt_voice.py . --check-script` (`references/handoff.md` § Script check) and fix what it reports. A concept a `next` line names gets one sentence on what it will do.
 
 Show the title, the script, its word count and estimated length, and one line on where the text goes:
 
 - Qwen3-TTS, built-in speaker or cloned voice: "This script is voiced on this Mac with Qwen3-TTS; the text does not leave the machine."
-- own source: "You voice this script with your own engine once you approve it."
+- own source: "You voice this script with your own engine once you approve it." In a discussion, one file per turn (`references/handoff.md` § The user's own engine).
 
 Wait for approval or edits; loop until approved. Record the approval time and SHA-256 in `RUN.md`. Nothing is voiced or built before this approval.
 

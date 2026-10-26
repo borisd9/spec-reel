@@ -105,9 +105,22 @@ uv run --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
 say -v Samantha -f {text_file} -o {out}.aiff
 ```
 
-The spoken text reaches the command only through `{text_file}`. A command never contains a credential: if your tool needs a key, the command reads it from an environment variable or a file outside this folder. The skill refuses to save a command that contains a key.
+In a discussion (below), the command runs once per turn, `{out}` is `voice-in/NN.K`, and `{speaker}` is `A` or `B`; a command without `{speaker}` cannot voice two speakers, so drop the turn files instead. The spoken text reaches the command only through `{text_file}`. A command never contains a credential: if your tool needs a key, the command reads it from an environment variable or a file outside this folder. The skill refuses to save a command that contains a key.
 
 `scripts/adopt_voice.py` then converts the files to WAV, gets word timings with `npx hyperframes transcribe`, and writes the audio metadata the build reads. It keeps the script's own words on the transcript timings and reports lines that were heard differently (`--check-speech`; spelling-only differences are not reported). A transcript is remembered by the audio's hash, so changing one line means replacing one file and running it again: only that file is transcribed. To re-voice by word, `qwen_voice.py --frames-with id`; every voicing first copies the files it replaces into `voice-takes/`, and `--restore` puts a take back.
+
+## Discussion mode (optional)
+
+By default one narrator reads every line. In a discussion, two speakers, A and B, talk with each other, like a short podcast: A hosts (opens the topic, asks, sums up) and B explains. The skill asks at the start of a run which voice each speaker uses: a built-in speaker, your cloned voice, or your own engine for both. There is no default pair. A script line is a topic, and the several turns of its speakers share that line's one scene. Both speakers say only points from the digest.
+
+In the script, a topic line holds `### Turn — A` and `### Turn — B` sections, and the header names the voices with `**Voices:** A — <voice>; B — <voice>`. Each turn is voiced into its own file, `voice-in/NN.K.wav`, and `adopt_voice.py` joins a line's turns into one WAV with a short silence between them, so the rest of the build is the same. By hand:
+
+```bash
+uv run --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
+  python scripts/qwen_voice.py <run folder> --voice A=Aiden --voice B=Ryan
+```
+
+A voice is a built-in speaker name or `clone`. With `--yolo`, a discussion happens only when you ask for one; A is your `qwen_speaker` and B is the other English voice.
 
 ## First run
 
@@ -125,7 +138,7 @@ For a run with no questions at all, add `--yolo`:
 
 It uses the defaults (a team update, about 75 seconds, the configured voice), decides every review itself, renders the MP4, and ends with a list of everything it decided without you. It never posts or shares the video. Your agent may still ask permission to run commands (`npx`, `ffmpeg`, `uv`, `curl`, `gh`) unless your permission mode allows them.
 
-Without `--yolo`, the skill asks, in one batch: the links or files, the audience and intent, the target length (default 60-90 seconds) and the voice source. Then approve the digest, approve the script, review the frame plan, and approve the stills before the render. Before the stills, the skill checks that every name, number and capability shown on screen comes from your sources.
+Without `--yolo`, the skill asks, in one batch: the links or files, the audience and intent, the target length (default 60-90 seconds), the voice source and the format (narration or discussion). Then approve the digest, approve the script, review the frame plan, and approve the stills before the render. Before the stills, the skill checks that every name, number and capability shown on screen comes from your sources.
 
 `scripts/finish.py <run> --review` and `--final` are the two commands that follow any change: adopt the voice, build `index.html`, check the scenes, and (for `--final`) render, normalize the loudness to -16 LUFS with `scripts/qc_video.py`, check the MP4's format, audio, black spans and length, and add the cover. `--review` looks only at the scenes that changed since its last run. Scenes use no CSS filters, so the renderer stays in fast capture.
 
