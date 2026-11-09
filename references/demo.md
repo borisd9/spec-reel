@@ -46,7 +46,7 @@ Record in `RUN.md` under `## Demo`: each `public/demo-NN.<ext>`, its original li
 
 ## In the script and the scenes
 
-- The script has one `## Line N — Demo (Frame N)` line per demo file, placed in the "what it changes" part. Its spoken text describes what the viewer sees, for example "Here you pick a file, and the upload starts right away." A recording's scene lasts as long as its line, so write the line about as long as the part of the recording that matters (about 150 words per minute).
+- The script has one `## Line N — Demo (Frame N)` line per demo file, placed beside the category's demo job (`references/categories.md` § demo), or in the "what it changes" part of a legacy run (no category). Its spoken text describes what the viewer sees, for example "Here you pick a file, and the upload starts right away." A recording's scene lasts as long as its line, so write the line about as long as the part of the recording that matters (about 150 words per minute).
 - In the storyboard, that frame names its file and uses it as the focal element:
 
   ```markdown

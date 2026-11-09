@@ -181,6 +181,15 @@ class SkillStructureTests(unittest.TestCase):
                   "anthropics/skills"):
             self.assertIn(s, notices)
 
+    def test_categories_are_wired_in(self):
+        skill = (ROOT / "SKILL.md").read_text()
+        for s in ("references/categories.md", "--category", "category <A|B|C>"):
+            self.assertIn(s, skill)
+        for f in ("references/handoff.md", "references/style.md", "references/yolo.md", "references/demo.md",
+                  "references/motion-styles.md"):
+            self.assertIn("references/categories.md", (ROOT / f).read_text(), f)
+        self.assertIn("instruct", (ROOT / "references/handoff.md").read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

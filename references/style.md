@@ -6,6 +6,8 @@ Read before showing the script at gate 2 and before writing `renders/share-copy.
 
 Each one has a short bad and good version.
 
+They hold for every video category, with no exception (`references/categories.md`).
+
 - **Contrast reveal.** Do not set up a claim only to knock it down.
   - Bad: "It is not a new queue, it is a new way to retry."
   - Good: "Failed uploads now retry on their own."
@@ -27,7 +29,7 @@ Each one has a short bad and good version.
 
 ## For the scenes
 
-- **Name what you explain.** A concept named on a `next` frame (a job, a check, a flag, a component) gets one sentence on what it will do, or it is not named. "Next comes the slow check job" tells the viewer nothing; "Next, a slow check will run every eval on drafts" does. The claim check flags a named concept with no explanation.
+- **Name what you explain.** A concept (a job, a check, a flag, a component) named on the last-job frame (`remember`, `takeaway` or `plans`, per `references/categories.md`; `next` in a legacy run) gets one sentence on what it will do, or it is not named. "Next comes the slow check job" tells the viewer nothing; "Next, a slow check will run every eval on drafts" does. The claim check flags a named concept with no explanation.
 
 ## For the voice
 
