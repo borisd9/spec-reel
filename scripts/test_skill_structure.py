@@ -5,10 +5,12 @@ document names that is not there, a retired skill still named, a config key miss
 """
 import json
 import re
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
 DOCS = [ROOT / "SKILL.md", ROOT / "README.md", *sorted((ROOT / "references").glob("*.md"))]
 # Files of the installed HyperFrames skill that these docs name on purpose (the dependency check in handoff.md).
 EXTERNAL = {"references/film.md", "references/format.md", "references/runtimes.md", "references/sound.md",
@@ -27,6 +29,13 @@ NAMED = re.compile(r"(?<![\w/.-])((?:references|scripts|assets)/[\w./-]*[\w]\.(?
 def frontmatter(md):
     m = re.match(r"^---\n(.*?)\n---\n", md, re.S)
     return dict(re.findall(r"^([\w-]+):\s*(.*)$", m.group(1), re.M)) if m else {}
+
+
+def jobs_line(jobs):
+    def one(job, required, fields):
+        return f"`{job}`" + (" (required)" if required else "") + \
+            (" needs " + " and ".join(f"`{f}`" for f in fields) if fields else "")
+    return "- jobs: " + ", ".join(one(*j) for j in jobs)
 
 
 class SkillStructureTests(unittest.TestCase):
@@ -150,6 +159,27 @@ class SkillStructureTests(unittest.TestCase):
         loop = re.search(r"^for f in (.+?); do$", (ROOT / "references/handoff.md").read_text(), re.M).group(1).split()
         self.assertIn("references/runtimes.md", loop)
         self.assertIn("references/types/3d.md", loop)
+
+    def test_categories_doc_matches_code(self):
+        from adopt_voice import CATEGORY_JOBS
+        text = (ROOT / "references/categories.md").read_text()
+        heads = {"A": "## A · Concept Map", "B": "## B · Analogous Storyboard", "C": "## C · Analytical Report"}
+        styles = set(re.findall(r"^## ([a-z0-9-]+) — ", (ROOT / "references/motion-styles.md").read_text(), re.M))
+        for cat, jobs in CATEGORY_JOBS.items():
+            body = text.split(heads[cat], 1)[1].split("\n## ", 1)[0]
+            self.assertIn(jobs_line(jobs), body, cat)
+            self.assertRegex(body, re.compile(r'^- instruct: ".+"$', re.M), cat)
+            looks = re.findall(r"`([a-z0-9-]+)`", re.search(r"^- looks: (.+)$", body, re.M).group(1))
+            self.assertTrue(looks and set(looks) <= styles, cat)
+            self.assertRegex(re.search(r"^- source: (.+)$", body, re.M).group(1), r"github\.com/")
+        self.assertIn("## Suggesting a category", text)
+
+    def test_category_credits(self):
+        notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text()
+        for s in ("Copyright (c) 2025 Nico Bailon", "Copyright (c) 2026 Matt Pocock", "Copyright 2026 Anthropic, PBC",
+                  "Apache License", "Version 2.0, January 2004", "nicobailon/visual-explainer", "mattpocock/skills",
+                  "anthropics/skills"):
+            self.assertIn(s, notices)
 
 
 if __name__ == "__main__":
