@@ -21,7 +21,7 @@ How a run goes:
 9. Put the title on the first frame as the cover, and write a share caption.
 10. Report what was made.
 
-After you approve the script, the skill writes three looks made for the subject, renders the intro in each, opens the three clips, and you pick one. The pick styles every scene, so no two videos share a look.
+After you approve the script, the skill writes three looks made for the subject, renders the intro in each, opens the three clips, and you pick one. The pick styles every scene, so no two videos share a look. A look can use any Google Fonts family; the skill downloads it into the run folder.
 
 With `--yolo`, the skill makes every approval itself and lists those decisions in the report (see [First run](#first-run)).
 

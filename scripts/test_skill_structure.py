@@ -93,6 +93,15 @@ class SkillStructureTests(unittest.TestCase):
         for kept in ("<template>", 'data-composition-id="SCENE_ID"', "window.__timelines[S] = tl"):
             self.assertIn(kept, t)
 
+    def test_gate_3_decisions_2026_11_09(self):
+        skill = (ROOT / "SKILL.md").read_text()
+        self.assertIn("last three runs", skill)
+        self.assertNotIn("last five runs", skill)
+        self.assertIn("scripts/fetch_font.py", skill)
+        yolo = (ROOT / "references/yolo.md").read_text()
+        self.assertIn("--look", yolo)
+        self.assertNotIn("skip look_samples.py", yolo)
+
 
 if __name__ == "__main__":
     unittest.main()

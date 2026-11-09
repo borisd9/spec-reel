@@ -174,14 +174,16 @@ one found, run `--review` again, then show the stills. At most two rounds. Name 
 
 ## My calls (not yet confirmed by the user)
 
+Confirmed by the user on 2026-11-09, with changes: uniqueness counts the last 3 runs, yolo renders the recommended look's sample, and fonts can be any Google Fonts family fetched by `scripts/fetch_font.py`. The other calls stand.
+
 - Three looks, matching HyperFrames' three storylines.
 - The samples wait for the adopted voice. Voicing and writing the three looks run at the same time, so the wait is
   mostly the three short renders.
-- Yolo skips the sample renders.
-- Bundled font families only, so no `.woff2` files are added to a run. Any weight is allowed: the HyperFrames
-  compiler fetches missing weights from Google Fonts and caches them in `~/.cache/hyperframes/fonts`. Ceiling: 19
-  families; add downloaded `.woff2` files when looks start to repeat.
+- Yolo renders only the recommended look's sample, and tries the next look when it fails.
+- A look may use any Google Fonts family, in any weight. `scripts/fetch_font.py` downloads the family's Latin
+  `.woff2` files into the run's `assets/fonts/` and prints the `@font-face` rules for the look's template; bundled
+  families need no download. A failed fetch means a bundled family.
 - With the user's own engine and no `tts_command`, the samples wait until the user has dropped every line's audio.
 - `style_preset` is removed (see Files that change).
-- Uniqueness is checked against the last five runs.
+- Uniqueness is checked against the last three runs.
 - Shapes are checked only for frames in a row; a shape may come back later in the video.
