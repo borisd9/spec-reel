@@ -78,7 +78,7 @@ def main(argv, runner=run_command):
     if len(args) != 1:
         print(USAGE, file=sys.stderr)
         return 1
-    p = Path(args[0])
+    p = Path(args[0]).absolute()  # the render runs in sample/, so its -o path must not depend on the cwd
     looks = [d for d in look_dirs(p) if only in (None, d.name)]
     problems = [] if looks else [f"no look folder {only or '<n>-<slug>'} under {p / 'looks'}"]
     v = intro_voice(p)

@@ -2,6 +2,7 @@
 import contextlib
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -66,6 +67,14 @@ class LookSamplesTests(unittest.TestCase):
             self.assertTrue((sample / "assets/voice/01.wav").exists())
             self.assertIn('data-composition-id="intro"', (sample / "index.html").read_text())
             self.assertIn(str(self.p / "looks" / name / "intro.mp4"), self.calls[["1-paper", "2-blueprint"].index(name)][0])
+
+    def test_relative_project_dir_gives_an_absolute_output_path(self):
+        cwd = os.getcwd()
+        os.chdir(self.p)
+        self.addCleanup(os.chdir, cwd)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(ls.main(["."], runner=self.runner), 0)
+        self.assertTrue(all(Path(c[0][-1]).is_absolute() for c in self.calls))
 
     def test_one_look_only(self):
         self.assertEqual(self.main("--look", "2-blueprint"), 0)
