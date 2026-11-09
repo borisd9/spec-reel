@@ -16,7 +16,7 @@
 
 **Test command (whole suite):** `cd scripts && python3 -I -m unittest discover -s . -p 'test_*.py'`. There is no linter.
 
-> **Superseded on 2026-11-09 by the user's gate 3 decisions** (`2026-11-09-per-run-look-amendments.md`): recent-style exclusion counts the last 3 runs, yolo renders the recommended look's sample, and fonts may be any Google Fonts family (`scripts/fetch_font.py`). The catalog follows these: `pixel` uses Press Start 2P, `cel` uses Patrick Hand and `painterly` uses Caveat Brush. Where this plan says otherwise, the decisions win.
+> **Superseded on 2026-11-09 by the user's gate 3 decisions** (`2026-11-09-per-run-look-amendments.md`): recent-style exclusion counts the last 3 runs, yolo renders the recommended look's sample, and fonts may be any Google Fonts family (`scripts/fetch_font.py`). The catalog follows these: `pixel` uses Press Start 2P, `cel` uses Patrick Hand and `painterly` uses Caveat Brush. Where this plan says otherwise, the decisions win. `toy3d` and `tape` were then dropped (WebGL forces screenshot capture), so the catalog has 14 styles.
 
 ## Global Constraints
 

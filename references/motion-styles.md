@@ -8,8 +8,7 @@ Conventions:
 
 - Output is 1920x1080 at 30 fps. Frame counts are written as `N f (S s)` at 30 fps.
 - `runtime: gsap`: every effect is a GSAP `fromTo` of DOM or SVG elements. No CSS filters, no `onUpdate:`. A counter is a strip of digit elements moved with `y`, not a tween that rewrites text.
-- `runtime: hf-seek`: a `<canvas>` drawn from `e.detail.time` in an `hf-seek` listener (`<hyperframes dir>/references/runtimes.md`, `<hyperframes dir>/references/types/3d.md`). `render(t)` is a pure function of `t`. Anything simulated is computed once at load into arrays. Heavy setup registers `window.__hf.buildReady["<style id>"]`. Seed every random choice with `fx.rand(seed)`; never `Math.random()`.
-- Three.js is `https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js`.
+- `runtime: hf-seek`: a `<canvas>` drawn with Canvas 2D only (`getContext("2d")`) from `e.detail.time` in an `hf-seek` listener (`<hyperframes dir>/references/runtimes.md`, `<hyperframes dir>/references/types/3d.md`). `render(t)` is a pure function of `t`. Anything simulated is computed once at load into arrays. Heavy setup registers `window.__hf.buildReady["<style id>"]`. Seed every random choice with `fx.rand(seed)`; never `Math.random()`. WebGL fails the fast-capture lint, because it always forces screenshot capture.
 - Cubic-bezier eases load as `CustomEase` (`https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/CustomEase.min.js`, already in `assets/index.template.html`): `CustomEase.create("snap", "M0,0 C0.7,0 0.2,1 1,1")`.
 - Rates that are not 30 fps: on twos at 24 fps draws `floor(t * 12)`. 12 fps steps are `fx.stepped(d)` in `gsap` and `floor(t * 12)` in `hf-seek`.
 - Fonts are any Google Fonts family. A family outside the HyperFrames bundle is downloaded with `scripts/fetch_font.py` (`SKILL.md` § Look (gate 3)). Inter, Space Grotesk and JetBrains Mono are never the display face.
@@ -42,7 +41,7 @@ Conventions:
 - palette: ground #0d1b2a · accent #f72585 · shade #7209b7 · shade #4cc9f0
 - fonts: display League Gothic 400 · body Lato 400
 - runtime: gsap + hf-seek
-- motion: SVG morphs are `fromTo` tweens of paths with the same number of points, 18 to 30 f (0.6 to 1.0 s) each, through a readable in-between shape. Hold every finished shape at least 30 f (1.0 s). Liquid moments are a canvas of metaballs drawn from `e.detail.time` in `hf-seek` with smooth-min blending, the ball paths computed once at load. No cuts, and the camera stays still.
+- motion: SVG morphs are `fromTo` tweens of paths with the same number of points, 18 to 30 f (0.6 to 1.0 s) each, through a readable in-between shape. Hold every finished shape at least 30 f (1.0 s). Liquid moments are a Canvas 2D drawing of metaballs drawn from `e.detail.time` in `hf-seek` with smooth-min blending, the ball paths computed once at load. No cuts, and the camera stays still.
 - rules: There are no cuts. Every new idea grows out of the previous shape. Each morph takes 18 to 30 frames and passes through a readable in-between shape. Hold each finished shape at least 1 second so it reads. Liquid joins use smooth-min blending, never a hard overlap.
 - avoid: Morphs that pass through a shapeless blob, constant motion with no holds
 - prompt: Style: continuous shape morph. Dark #0d1b2a field, shapes in #f72585, #7209b7, #4cc9f0. No cuts: each idea grows out of the previous shape through a readable in-between form over 18 to 30 frames, then holds for at least 1 second. Liquid moments use metaball blending so drops merge smoothly. Camera stays still; the shapes do the moving. Type: League Gothic 400 for display, Lato 400 for body.
@@ -168,31 +167,11 @@ Conventions:
 - avoid: Mixed pixel sizes, blurry scaling, anti-aliased edges, smooth sub-pixel motion
 - prompt: Style: 16-bit pixel art. Render to a 320x180 canvas and scale 6x with imageSmoothingEnabled = false. Use one fixed palette (#1a1c2c, #5d275d, #b13e53, #ef7d57, #ffcd75, #a7f070, #38b764, #41a6f6 plus greys). Shading by dithering only. Sprites animate at 8 to 12fps, camera moves in whole pixels, dialogue in a pixel font that types out in a bordered box. Type: Space Mono 700 for display, Space Mono 400 for body.
 
-## tape — VHS, film & CRT eras
-- group: retro
-- fits: throwback and teaser pieces, mood over data, a title with one clear message
-- palette: ground #120f1d · accent #ff3fa4 · shade #00e5ff · shade #ffd166
-- fonts: display Archivo Black 400 · body Space Mono 400
-- runtime: hf-seek
-- motion: one era per video: 1920s film, 1980s VHS or 1990s camcorder. A clear composition drawn on a canvas, then a post pass drawn over it. Grain is seeded by frame index: `fx.rand(Math.round(t * 30))`. Film: gate weave of about 1 px and brightness flicker of about 5%. Tape: chroma shift of 2 to 3 px, scanlines, an occasional tracking line. The effect never covers key text.
-- rules: Pick one era and commit: 1920s film, 1980s VHS, or 1990s camcorder. Texture is seeded per frame index, so grain changes every frame but renders the same every time. Gate weave of about 1px and brightness flicker of about 5% for film. Chroma shift of 2 to 3px for tape. Keep it legible: the effect sits on top of a clear composition, it is not the composition.
-- avoid: Stacking every retro effect at once, glitch tearing over important text
-- prompt: Style: 1980s VHS tape. Scene in deep #120f1d with neon accents #ff3fa4, #00e5ff and warm #ffd166. Post pass: scanlines, 2 to 3px chroma shift, slight tape noise and an occasional tracking line, all seeded by frame index so the render is deterministic. A chrome title moment. Keep the composition clear underneath; the tape texture never covers key text. Type: Archivo Black 400 for display, Space Mono 400 for body.
-
-## toy3d — Toy & material 3D
-- group: dimensional
-- fits: a product or object as the hero, friendly explainers, brand idents
-- palette: ground #f6e6e4 · accent #ff8fab · shade #7bdff2 · shade #b2f7ef · shade #fcbf49
-- fonts: display Nunito 800 · body Nunito 600
-- runtime: hf-seek
-- motion: Three.js (pinned above), drawn from `e.detail.time`, with `buildReady` for the setup. Soft studio light: one large key and a fill. Matte or soft-gloss materials. Shallow depth of field on the hero object. An object lands fast with 2 small settles, computed as a closed-form function of `t`, always with a contact shadow. Every procedural shape uses a fixed `fx.rand` seed.
-- rules: Soft studio light from one big key and a fill. Matte or soft-gloss materials. Shallow depth of field keeps attention on one object. Objects arrive with weight: fast in, 2 small settles, no floating. Fixed random seed for every procedural shape.
-- avoid: Chrome everything, hard black shadows, objects floating with no contact shadow
-- prompt: Style: toy-like 3D. Three.js, soft studio lighting with one large key and a fill, pastel background #f6e6e4, matte and soft-gloss materials in #ff8fab, #7bdff2, #b2f7ef, #fcbf49. Shallow depth of field on the hero object. Objects land with weight and two small settles, always with a contact shadow. Fixed seeds for any procedural geometry. Type: Nunito 800 for display, Nunito 600 for body.
-
 ## Not used, and why
 
 `social` is 9:16, while spec-reel renders 1920x1080 only (`qc_video.py`). The user chose to skip it on 2026-11-09.
+
+`toy3d` and `tape`: both need WebGL, which always forces screenshot capture (`webgl-context detected`), about twice the render time. Dropped by the user on 2026-11-09.
 
 ## Default avoid list
 
@@ -206,4 +185,4 @@ Gate 3 picks three styles from this page by these rules, in this order.
 2. **Recent styles.** A style named in the `STYLE:` line of any of the last three runs' `SPEC.md` is not picked. When that leaves fewer than three groups, drop exclusions oldest first until three groups are available. The gate never fails for this.
 3. **Recommendation.** The recommended look is the style whose `fits` best matches the approved digest. It goes first, with a one-clause reason.
 
-Worked example of rule 2. Take a catalog trimmed to four styles: `swiss` and `morph` (graphic), `dataviz` (explain), `print` (drawn). The last three runs used, newest first, `dataviz`, `print`, `swiss`. That excludes all of explain and drawn and one of graphic, leaving `morph`: one group. Drop the oldest exclusion, `swiss`: still only graphic. Drop the next oldest, `print`: graphic and drawn, two groups. Drop `dataviz`: three groups, so the pick is `swiss` or `morph`, `dataviz` and `print`. With the 16 styles above this cannot happen yet: taking away three groups needs at least 7 excluded styles, and three runs name at most 3. The rule stays for a smaller catalog.
+Worked example of rule 2. Take a catalog trimmed to four styles: `swiss` and `morph` (graphic), `dataviz` (explain), `print` (drawn). The last three runs used, newest first, `dataviz`, `print`, `swiss`. That excludes all of explain and drawn and one of graphic, leaving `morph`: one group. Drop the oldest exclusion, `swiss`: still only graphic. Drop the next oldest, `print`: graphic and drawn, two groups. Drop `dataviz`: three groups, so the pick is `swiss` or `morph`, `dataviz` and `print`. With the 14 styles above this cannot happen yet: taking away three groups needs at least 5 excluded styles, and three runs name at most 3. The rule stays for a smaller catalog.

@@ -14,7 +14,7 @@ DOCS = [ROOT / "SKILL.md", ROOT / "README.md", *sorted((ROOT / "references").glo
 EXTERNAL = {"references/film.md", "references/format.md", "references/runtimes.md", "references/sound.md",
             "references/spec.md"}
 STYLE_KEYS = ["group", "fits", "palette", "fonts", "runtime", "motion", "rules", "avoid", "prompt"]
-HF_SEEK = {"painterly", "tape", "toy3d", "pixel", "cel"}
+HF_SEEK = {"painterly", "pixel", "cel"}
 BANNED = ("faceless-explainer", "Skill tool", "run_in_background")
 # A path into one agent's HyperFrames copy; the search loop in handoff.md names folders without a trailing slash.
 AGENT_PATH = re.compile(r"\.\w+/skills/hyperframes/")
@@ -120,6 +120,7 @@ class SkillStructureTests(unittest.TestCase):
             self.assertIn(runtime, {"gsap", "hf-seek", "gsap + hf-seek"}, sid)
             if sid in HF_SEEK:
                 self.assertEqual(runtime, "hf-seek", sid)
+            self.assertNotRegex(body, r"(?i)three\.js|webgl", sid)
         self.assertIn("## Not used, and why", text)
         self.assertIn("## Default avoid list", text)
         self.assertIn("awesomeclaude.ai", text)
