@@ -2,7 +2,7 @@
 
 Styles adapted from Awesome Claude (https://awesomeclaude.ai/claude-motion-graphics, github.com/webfuse-com/awesome-claude, CC0-1.0; site footer says MIT).
 
-Gate 3 (`SKILL.md` § Look (gate 3)) builds each of its three looks from one style on this page. A style is numbers: a palette, bundled fonts, a runtime, eases, timings, rules, an avoid list and a style prompt. A look copies them and changes only what `## Picking three` allows.
+Gate 3 (`SKILL.md` § Look (gate 3)) builds each of its three looks from one style on this page. A style is numbers: a palette, fonts, a runtime, eases, timings, rules, an avoid list and a style prompt. A look copies them and changes only what `## Picking three` allows.
 
 Conventions:
 
@@ -12,7 +12,7 @@ Conventions:
 - Three.js is `https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js`.
 - Cubic-bezier eases load as `CustomEase` (`https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/CustomEase.min.js`, already in `assets/index.template.html`): `CustomEase.create("snap", "M0,0 C0.7,0 0.2,1 1,1")`.
 - Rates that are not 30 fps: on twos at 24 fps draws `floor(t * 12)`. 12 fps steps are `fx.stepped(d)` in `gsap` and `floor(t * 12)` in `hf-seek`.
-- Fonts are only the bundled families (`SKILL.md` § Look (gate 3)). Inter, Space Grotesk and JetBrains Mono are never the display face.
+- Fonts are any Google Fonts family. A family outside the HyperFrames bundle is downloaded with `scripts/fetch_font.py` (`SKILL.md` § Look (gate 3)). Inter, Space Grotesk and JetBrains Mono are never the display face.
 
 ## swiss — Swiss grid & kinetic type
 - group: graphic
@@ -117,7 +117,7 @@ Conventions:
 - group: drawn
 - fits: stories, places, culture and people topics, soft explainers with little text
 - palette: ground #f4efe6 · ink #2f3e46 · accent #bc4749 · shade #6a994e · shade #a7c4d2
-- fonts: display EB Garamond 500 · body Lato 400
+- fonts: display Caveat Brush 400 · body Lato 400
 - runtime: hf-seek
 - motion: a plain Canvas 2D brush engine (strokes with a width profile, no p5). Washes spread over 15 to 25 f (0.5 to 0.83 s) and bleed 4 to 8 px past the ink line. Linework is re-seeded 12 times a second: seed = `floor(t * 12)` into `fx.rand`, so it wobbles on twos without flicker. The paper grain is drawn once from a fixed seed. Pure white and pure black never appear.
 - rules: Everything is painted with strokes. No plain vector shapes. Washes reveal over 15 to 25 frames and bleed 4 to 8px past the ink line. Paper texture is always visible; pure white and pure black never appear. Linework re-randomises 12 times a second from a seed, so it lives without flickering.
@@ -150,7 +150,7 @@ Conventions:
 - group: drawn
 - fits: playful explainers, diagrams, arrows and icons that feel drawn by hand
 - palette: ground #fffaf0 · ink #1c1c1c · accent #ff595e · shade #1982c4 · shade #ffca3a
-- fonts: display Outfit 800 · body Nunito 600
+- fonts: display Patrick Hand 400 · body Nunito 600
 - runtime: hf-seek
 - motion: Canvas 2D variable-width strokes, on twos at 24 fps: the drawing index is `floor(t * 12)`. Three jitter variants of every line, variant = `floor(t * 12) % 3`, each from a fixed `fx.rand` seed, so lines boil without strobing. A fast move gets one smear frame (the shape stretched along its path for one drawing) instead of motion blur. Anticipation before every big action: a small move the other way for 4 to 6 f (0.13 to 0.2 s).
 - rules: Animate on twos: the drawing changes every 2 frames at 24fps. Cycle 3 jitter variants of every line so it boils without strobing. Fast moves get a smear frame instead of motion blur. Anticipation before every big action: a small move the other way for 4 to 6 frames.
@@ -161,9 +161,9 @@ Conventions:
 - group: retro
 - fits: nostalgia and game-like stories, year in review, step-by-step levels
 - palette: ground #1a1c2c · shade #5d275d · shade #b13e53 · accent #ef7d57 · shade #ffcd75 · shade #a7f070 · shade #38b764 · shade #41a6f6
-- fonts: display Space Mono 700 · body Space Mono 400
+- fonts: display Press Start 2P 400 · body Press Start 2P 400
 - runtime: hf-seek
-- motion: draw on a 320x180 canvas and scale it 6x to 1920x1080 with `imageSmoothingEnabled = false`. Sprites animate at 8 to 12 fps: frame = `floor(t * 12)` or `floor(t * 8)`. The camera moves in whole pixels (`Math.round`). Shading is dithering. Text is Space Mono drawn with `fillText` on the small canvas, typed out in a bordered box one character per beat. Keep a `ponytail:` comment on that line of the look's code: text may look soft; the fix is a 5x7 bitmap font table.
+- motion: draw on a 320x180 canvas and scale it 6x to 1920x1080 with `imageSmoothingEnabled = false`. Sprites animate at 8 to 12 fps: frame = `floor(t * 12)` or `floor(t * 8)`. The camera moves in whole pixels (`Math.round`). Shading is dithering. Text is Press Start 2P at 8 px drawn with `fillText` on the small canvas, typed out in a bordered box one character per beat.
 - rules: Draw at 320x180 and scale by 6 with image smoothing off. Never draw at full resolution. One fixed palette of 16 to 32 colours. Shading uses dithering, not blending. Sprites animate at 8 to 12fps; the camera snaps to whole pixels. Text uses a pixel font and types out in dialogue boxes.
 - avoid: Mixed pixel sizes, blurry scaling, anti-aliased edges, smooth sub-pixel motion
 - prompt: Style: 16-bit pixel art. Render to a 320x180 canvas and scale 6x with imageSmoothingEnabled = false. Use one fixed palette (#1a1c2c, #5d275d, #b13e53, #ef7d57, #ffcd75, #a7f070, #38b764, #41a6f6 plus greys). Shading by dithering only. Sprites animate at 8 to 12fps, camera moves in whole pixels, dialogue in a pixel font that types out in a bordered box. Type: Space Mono 700 for display, Space Mono 400 for body.

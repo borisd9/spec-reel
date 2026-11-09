@@ -13,9 +13,6 @@ DOCS = [ROOT / "SKILL.md", ROOT / "README.md", *sorted((ROOT / "references").glo
 # Files of the installed HyperFrames skill that these docs name on purpose (the dependency check in handoff.md).
 EXTERNAL = {"references/film.md", "references/format.md", "references/runtimes.md", "references/sound.md",
             "references/spec.md"}
-FONTS = {"Inter", "Montserrat", "Outfit", "Nunito", "Oswald", "League Gothic", "Archivo Black", "Space Mono",
-         "IBM Plex Mono", "JetBrains Mono", "EB Garamond", "Playfair Display", "Source Code Pro", "Noto Sans JP",
-         "Roboto", "Open Sans", "Lato", "Poppins", "Space Grotesk"}
 STYLE_KEYS = ["group", "fits", "palette", "fonts", "runtime", "motion", "rules", "avoid", "prompt"]
 HF_SEEK = {"painterly", "tape", "toy3d", "pixel", "cel"}
 BANNED = ("faceless-explainer", "Skill tool", "run_in_background")
@@ -118,8 +115,6 @@ class SkillStructureTests(unittest.TestCase):
             fonts = re.search(r"^- fonts: (.+)$", body, re.M).group(1)
             display = re.match(r"display ([A-Za-z ]+?) \d", fonts).group(1)
             self.assertNotIn(display, {"Inter", "Space Grotesk", "JetBrains Mono"}, sid)
-            for family in re.findall(r"([A-Z][A-Za-z ]+?) \d{3}", fonts):
-                self.assertIn(family, FONTS, f"{sid}: {family}")
             self.assertRegex(re.search(r"^- palette: (.+)$", body, re.M).group(1), r"#[0-9a-f]{6}")
             runtime = re.search(r"^- runtime: (.+)$", body, re.M).group(1)
             self.assertIn(runtime, {"gsap", "hf-seek", "gsap + hf-seek"}, sid)
