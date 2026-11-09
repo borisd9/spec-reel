@@ -12,6 +12,11 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCS = [ROOT / "SKILL.md", ROOT / "README.md", *sorted((ROOT / "references").glob("*.md"))]
 # Files of the installed HyperFrames skill that these docs name on purpose (the dependency check in handoff.md).
 EXTERNAL = {"references/film.md", "references/format.md", "references/sound.md", "references/spec.md"}
+FONTS = {"Inter", "Montserrat", "Outfit", "Nunito", "Oswald", "League Gothic", "Archivo Black", "Space Mono",
+         "IBM Plex Mono", "JetBrains Mono", "EB Garamond", "Playfair Display", "Source Code Pro", "Noto Sans JP",
+         "Roboto", "Open Sans", "Lato", "Poppins", "Space Grotesk"}
+STYLE_KEYS = ["group", "fits", "palette", "fonts", "runtime", "motion", "rules", "avoid", "prompt"]
+HF_SEEK = {"painterly", "tape", "toy3d", "pixel", "cel"}
 BANNED = ("faceless-explainer", "Skill tool", "run_in_background")
 # A path into one agent's HyperFrames copy; the search loop in handoff.md names folders without a trailing slash.
 AGENT_PATH = re.compile(r"\.\w+/skills/hyperframes/")
@@ -101,6 +106,27 @@ class SkillStructureTests(unittest.TestCase):
         yolo = (ROOT / "references/yolo.md").read_text()
         self.assertIn("--look", yolo)
         self.assertNotIn("skip look_samples.py", yolo)
+
+    def test_motion_styles_catalog(self):
+        text = (ROOT / "references/motion-styles.md").read_text()
+        sections = dict(re.findall(r"^## ([a-z0-9-]+) — .+?\n(.*?)(?=^## |\Z)", text, re.S | re.M))
+        self.assertEqual(set(sections), {"swiss", "flat-vector", "morph", "line-draw", "dataviz", "isometric",
+                                         "dark-keynote", "screencast", "hud", "print", "papercut", *HF_SEEK})
+        for sid, body in sections.items():
+            self.assertEqual(re.findall(r"^- (\w+):", body, re.M), STYLE_KEYS, sid)
+            fonts = re.search(r"^- fonts: (.+)$", body, re.M).group(1)
+            display = re.match(r"display ([A-Za-z ]+?) \d", fonts).group(1)
+            self.assertNotIn(display, {"Inter", "Space Grotesk", "JetBrains Mono"}, sid)
+            for family in re.findall(r"([A-Z][A-Za-z ]+?) \d{3}", fonts):
+                self.assertIn(family, FONTS, f"{sid}: {family}")
+            self.assertRegex(re.search(r"^- palette: (.+)$", body, re.M).group(1), r"#[0-9a-f]{6}")
+            runtime = re.search(r"^- runtime: (.+)$", body, re.M).group(1)
+            self.assertIn(runtime, {"gsap", "hf-seek", "gsap + hf-seek"}, sid)
+            if sid in HF_SEEK:
+                self.assertEqual(runtime, "hf-seek", sid)
+        self.assertIn("## Not used, and why", text)
+        self.assertIn("## Default avoid list", text)
+        self.assertIn("awesomeclaude.ai", text)
 
 
 if __name__ == "__main__":
