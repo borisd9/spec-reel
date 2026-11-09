@@ -637,10 +637,12 @@ INTRO_STORYBOARD = """## Frame 1 — Intro
 - voiceover: "This is a short tour of the new upload flow."
 ## Frame 2 — Middle
 - scene_job: change
+- shape: before-after
 - before: "Uploads fail silently."
 - after: "Uploads show an error."
 ## Frame 3 — End
 - scene_job: next
+- shape: steps
 """
 
 
@@ -766,10 +768,35 @@ class CheckScriptTests(Base):
     def test_intro_and_demo_frames_need_no_scene_job(self):
         script = INTRO_SCRIPT.replace("Middle (Frame 2)", "Demo (Frame 2)")
         storyboard = INTRO_STORYBOARD.replace(
-            "## Frame 2 — Middle\n- scene_job: change\n- before: \"Uploads fail silently.\"\n- after: \"Uploads show an error.\"",
+            "## Frame 2 — Middle\n- scene_job: change\n- shape: before-after\n- before: \"Uploads fail silently.\"\n- after: \"Uploads show an error.\"",
             "## Frame 2 — Demo\n- asset_candidates: public/demo-01.mp4 — [video] the upload")
         code, err = self.with_demo(script, storyboard)
         self.assertEqual(code, 0, err)
+
+    def test_frame_without_shape_is_named(self):
+        code, err = self.check(INTRO_SCRIPT, INTRO_STORYBOARD.replace("- shape: steps\n", ""))
+        self.assertEqual(code, 1)
+        self.assertIn("frame 3: STORYBOARD.md has no shape", err)
+
+    def test_unknown_shape_counts_as_missing(self):
+        code, err = self.check(INTRO_SCRIPT, INTRO_STORYBOARD.replace("shape: steps", "shape: bullets"))
+        self.assertEqual(code, 1)
+        self.assertIn("frame 3: STORYBOARD.md has no shape", err)
+
+    def test_two_frames_in_a_row_with_one_shape(self):
+        code, err = self.check(INTRO_SCRIPT, INTRO_STORYBOARD.replace("shape: steps", "shape: before-after"))
+        self.assertEqual(code, 1)
+        self.assertIn("frame 3: same shape as frame 2 (before-after)", err)
+
+    def test_demo_frame_between_same_shapes_still_fails(self):
+        script = INTRO_SCRIPT + "## Line 4 — Last (Frame 4)\n    The end.\n"
+        script = script.replace("End (Frame 3)", "Demo (Frame 3)")
+        storyboard = (INTRO_STORYBOARD.replace("## Frame 3 — End\n- scene_job: next\n- shape: steps\n",
+                                               "## Frame 3 — Demo\n- asset_candidates: public/demo-01.mp4 — [video] x\n")
+                      + "## Frame 4 — Last\n- scene_job: next\n- shape: before-after\n")
+        code, err = self.with_demo(script, storyboard)
+        self.assertEqual(code, 1)
+        self.assertIn("frame 4: same shape as frame 2 (before-after)", err)
 
     def test_title_on_another_frame_does_not_count(self):
         moved = INTRO_STORYBOARD.replace('- on_screen_title: "The New Upload Flow"\n', "") \

@@ -59,11 +59,12 @@ captions: <config captions>
 
 - Frame 1 is the intro: the approved title as the dominant on-screen text, nothing competing with it, and the intro line as the narration. The title is on screen from frame 0, because it becomes the cover.
 - Every frame has `src: compositions/<id>.html`, `<id>` a short readable name (`intro`, `rules`, `leak`). `build_index.py` reads the scene ids from these lines.
-- Every other frame gets a scene card: `- scene_job:` one of `why`, `change`, `proof` or `next`; for a `change` frame also `- before:` and `- after:` (what was true, what is true now). Demo frames need no `scene_job`.
+- Every other frame gets a scene card: `- scene_job:` one of `why`, `change`, `proof` or `next`; for a `change` frame also `- before:` and `- after:` (what was true, what is true now). Demo frames need no `scene_job`. A scene card also has `- shape:`, the shape of the line's information, one of `number`, `myth`, `before-after`, `converge`, `network`, `chosen`, `steps`, `screenshot`, `quote`, `chapter` (`<hyperframes dir>/references/types/explainer.md` § Shapes of information). Two frames in a row never share a shape; the intro and Demo frames have none.
 
   ```markdown
   ## Frame 3 — Retries
   - scene_job: change
+  - shape: before-after
   - before: "A failed upload had to be restarted by hand."
   - after: "A failed upload retries on its own."
   ```
@@ -79,12 +80,13 @@ Run it right after gate 2 and again once `STORYBOARD.md` exists:
 python3 -I <this skill's directory>/scripts/adopt_voice.py . --check-script
 ```
 
-It regenerates `SCRIPT.md` from `user_script.txt` (see Facts below), then fails when a turn heading is not exactly `### Turn — A` or `### Turn — B` (nothing after the letter), a turn has no text, text sits before a line's first turn, or turn headings exist and the header is missing or leaves out a speaker (the header is `**Voices:** A — <voice>; B — <voice>`, with `;` between the speakers; alternation and the 2 or 3 turns are style rules you check, not code checks). It also fails when the script does not open with `## Line 1 — Intro (Frame 1)`, when that line is longer than 20 written words, when any line has more than 30 written words (a discussion line's turns counted together), when a `public/demo-*` file has no Demo line, and, once `STORYBOARD.md` exists, when Frame 1 has no `on_screen_title`, a demo file has no frame naming it, or a frame other than the intro and the Demo frames has no `scene_job` (or a `change` frame has no `before` and `after`). It also **warns** (it does not fail) about words the voice may misread: identifiers with `_` or a hyphen and a digit, digits stuck to letters, lowercase acronyms. For each warning, reword the line or add a respelling (below). When it fails:
+It regenerates `SCRIPT.md` from `user_script.txt` (see Facts below), then fails when a turn heading is not exactly `### Turn — A` or `### Turn — B` (nothing after the letter), a turn has no text, text sits before a line's first turn, or turn headings exist and the header is missing or leaves out a speaker (the header is `**Voices:** A — <voice>; B — <voice>`, with `;` between the speakers; alternation and the 2 or 3 turns are style rules you check, not code checks). It also fails when the script does not open with `## Line 1 — Intro (Frame 1)`, when that line is longer than 20 written words, when any line has more than 30 written words (a discussion line's turns counted together), when a `public/demo-*` file has no Demo line, and, once `STORYBOARD.md` exists, when Frame 1 has no `on_screen_title`, a demo file has no frame naming it, or a frame other than the intro and the Demo frames has no `scene_job` (or a `change` frame has no `before` and `after`), has no `shape` (or one not on the list), or has the same `shape` as the frame before it (the intro and Demo frames skipped). It also **warns** (it does not fail) about words the voice may misread: identifiers with `_` or a hyphen and a digit, digits stuck to letters, lowercase acronyms. For each warning, reword the line or add a respelling (below). When it fails:
 
 - a missing or empty `on_screen_title` is fixed by writing the approved title into Frame 1;
 - a demo file with no frame naming it is fixed by adding its `asset_candidates` line to its Demo frame; a missing Demo line re-opens gate 2;
 - a wording change the user asked for at the plan review is applied to `user_script.txt` first, gate 2 is re-approved and its new SHA-256 recorded in `RUN.md`;
-- a missing `scene_job`, `before` or `after` is fixed by adding the line to that frame, taken from the approved digest.
+- a missing `scene_job`, `before` or `after` is fixed by adding the line to that frame, taken from the approved digest;
+- a missing or repeated `shape` is fixed by picking the shape that fits the line and differs from the frame before it.
 
 ### Facts
 

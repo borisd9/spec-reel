@@ -51,10 +51,11 @@ VOICE_STEM = re.compile(r"(\d+)(?:\.(\d+))?")  # voice-in file stem: frame, then
 DEMO_HEADING = re.compile(r"^#{2,3}\s+line\s+\d+\s+\W+\s*demo\s*\(frame\s+\d+\)", re.I | re.M)
 ASSETS_RE = re.compile(r"^\s*[-*]\s+asset_candidates\s*:\s*(.+?)\s*$", re.I)
 SCENE_JOBS = ("why", "change", "proof", "next")
+SHAPES = ("number", "myth", "before-after", "converge", "network", "chosen", "steps", "screenshot", "quote", "chapter")
 # Respelled for the voice only (the written script and SCRIPT.md keep the written form). The config `pronunciations`
 # setting is merged over this by the caller.
 BUILTIN_RESPELLINGS = {"id": "I-D", "ids": "I-Ds", "PR": "P R", "v8": "V-eight"}
-CARD_RE = re.compile(r"^\s*[-*]\s+(scene_job|before|after)\s*:\s*(.+?)\s*$", re.I)
+CARD_RE = re.compile(r"^\s*[-*]\s+(scene_job|before|after|shape)\s*:\s*(.+?)\s*$", re.I)
 
 
 def parse_script(md):
@@ -159,7 +160,7 @@ def named_assets(storyboard_md):
 
 
 def scene_cards(storyboard_md):
-    """STORYBOARD.md -> {frame: {"scene_job"|"before"|"after": value, "demo": True when it names a public/demo-* file}}."""
+    """STORYBOARD.md -> {frame: {"scene_job"|"before"|"after"|"shape": value, "demo": True when it names a public/demo-* file}}."""
     cards, cur = {}, None
     for line in storyboard_md.splitlines():
         h = FRAME_RE.match(line)
@@ -528,13 +529,20 @@ def check_script(p):
             problems.append("frame 1: STORYBOARD.md has no on_screen_title for the intro")
         problems += [f"{d}: no STORYBOARD.md frame names public/{d} in asset_candidates"
                      for d in demos if d not in named_assets(storyboard)]
+        prev = None  # (frame, shape) of the last checked frame
         for frame, card in sorted(scene_cards(storyboard).items()):
-            if frame == 1 or card.get("demo"):  # the intro and the Demo frames have no scene_job
+            if frame == 1 or card.get("demo"):  # the intro and the Demo frames have no scene_job or shape
                 continue
             if card.get("scene_job") not in SCENE_JOBS:
                 problems.append(f"frame {frame}: STORYBOARD.md has no scene_job")
             elif card["scene_job"] == "change" and not (card.get("before") and card.get("after")):
                 problems.append(f"frame {frame}: scene_job change needs before and after")
+            shape = card.get("shape")
+            if shape not in SHAPES:
+                problems.append(f"frame {frame}: STORYBOARD.md has no shape")
+            elif prev and prev[1] == shape:
+                problems.append(f"frame {frame}: same shape as frame {prev[0]} ({shape})")
+            prev = (frame, shape)
     for frame, text in approved:  # warnings only: they never fail the check
         for tok, why in risky_tokens(text):
             print(f'warning: frame {frame}: "{tok}" is {why}', file=sys.stderr)
