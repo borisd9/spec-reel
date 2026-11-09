@@ -1,6 +1,5 @@
 {
   "output_root": "~/Movies/hyperframes",
-  "style_preset": "blue-professional",
   "voice_source": "qwen",
   "qwen_speaker": "Aiden",
   "qwen_instruct": "",

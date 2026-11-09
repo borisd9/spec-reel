@@ -8,7 +8,7 @@ argument-hint: "[--yolo] links or paths to plans and specs"
 
 Links or files of plans and specs in, a narrated MP4 out. This skill owns the sources, the digest, the script, the voice, the review gates and the scripts that build and render (`scripts/`). It builds the scenes with the installed HyperFrames explainer route, `<hyperframes dir>/references/types/explainer.md` (`references/handoff.md` § Files this skill needs finds `<hyperframes dir>`).
 
-Stages: sources, digest, title and demo (gate 1), script (gate 2), frame plan, scenes, review stills, render. The user approves at each gate; nothing is voiced or built before gate 2.
+Stages: sources, digest, title and demo (gate 1), script (gate 2), look (gate 3), frame plan, scenes, review stills, render. The user approves at each gate; nothing is voiced or built before gate 2.
 
 Do not load the `hyperframes` skill as a skill (some agents block that for model invocation); read its files directly, under `<hyperframes dir>/`.
 
@@ -21,7 +21,7 @@ Do not load the `hyperframes` skill as a skill (some agents block that for model
 Config lives in `<this skill's directory>/config.json`, which is never committed and holds no secret.
 
 1. When `config.json` is missing, copy `config.example.json` to `config.json`.
-2. When a value is empty where it is required (`output_root`, `style_preset`, `voice_source`), ask for all the missing ones in one batch, write them to `config.json`, and continue. Later runs ask nothing about setup.
+2. When a value is empty where it is required (`output_root`, `voice_source`), ask for all the missing ones in one batch, write them to `config.json`, and continue. Later runs ask nothing about setup.
 3. `voice_source` is `qwen` (Qwen3-TTS on this Mac, the default), `own` (the user's own engine) or `clone` (the user's cloned voice, opt-in: never choose it unless the user picks it). `qwen_speaker` defaults to `Aiden` (`Ryan` is the other English voice). `qwen_instruct` (empty means a calm, conversational narrator) and `tts_command` (empty means the user drops audio files) may stay empty. `qwen_clone_audio` and `qwen_clone_transcript` (paths to a recording and to a file with its exact transcript, `~` allowed) are empty until the user picks the clone; setting them does not select it. `qwen_tempo` (default `1.0`, `0.5` to `2.0`, below 1 is slower) slows any Qwen3-TTS voice without changing pitch. `slide_pause_s` (default `1.0`, seconds of silence after every line but the last), `captions` (`off` default, or `on`) and `pronunciations` (respellings for Qwen3-TTS, for example `{"KBs": "K-Bs"}`) may stay at their defaults.
 4. `tts_command` uses `{text_file}` and `{out}` placeholders, and `{speaker}` in a discussion (see `references/handoff.md`) and never contains a credential. When asked to save a command that contains a key-like literal (a token, key or password), refuse and ask for the form where the command reads the key from an environment variable or a file outside this folder.
 
@@ -37,7 +37,7 @@ Every run has one folder holding all its artifacts, and a `RUN.md` that records 
 
 Run folders are never deleted.
 
-**Resume:** show the recorded run answers in one line and continue from the recorded stage. Reuse the recorded `hyperframes` path after checking that it still exists; when it does not, search again. Do not ask the run questions again, read the sources again, or regenerate approved work. Before continuing, compare each approved file's SHA-256 with the one in `RUN.md`. When one differs, tell the user which file changed and re-open its gate: a changed digest re-opens gate 1 and then gate 2; a changed `user_script.txt` re-opens gate 2 and then re-runs the frame plan and the scenes. At stage `scenes`, read `references/handoff.md` and the explainer route again before acting.
+**Resume:** show the recorded run answers in one line and continue from the recorded stage. Reuse the recorded `hyperframes` path after checking that it still exists; when it does not, search again. Do not ask the run questions again, read the sources again, or regenerate approved work. Before continuing, compare each approved file's SHA-256 with the one in `RUN.md`. When one differs, tell the user which file changed and re-open its gate: a changed digest re-opens gate 1 and then gate 2; a changed `looks/<pick>/LOOK.md` re-opens gate 3 and then rebuilds every scene; a changed `user_script.txt` re-opens gate 2 and keeps the picked look (the intro scene is rebuilt in it when line 1 changed; no new samples). At stage `scenes`, read `references/handoff.md` and the explainer route again before acting.
 
 **New run:** ask these in one batch (defaults in brackets):
 
@@ -60,7 +60,7 @@ npx hyperframes init "<folder>" --non-interactive --example=blank --skill=spec-r
 ```markdown
 # Run <folder name>
 
-stage: sources            # sources | digest | script | scenes | done
+stage: sources            # sources | digest | script | look | scenes | done
 
 ## Answers
 - hyperframes: <path of the HyperFrames skill folder>
@@ -83,6 +83,7 @@ stage: sources            # sources | digest | script | scenes | done
 ## Approvals
 - gate 1 (digest): <time>  sha256 <hash of capture/extracted/visible-text.txt>
 - gate 2 (script): <time>  sha256 <hash of user_script.txt>
+- gate 3 (look): <time>  <look name>  sha256 <hash of looks/<pick>/LOOK.md>
 
 ## Render
 - voice total: <s>  storyboard padding: <s>  MP4: <s>  difference: <s>
@@ -143,18 +144,44 @@ Show the title, the script, its word count and estimated length, and one line on
 
 Wait for approval or edits; loop until approved. Record the approval time and SHA-256 in `RUN.md`. Nothing is voiced or built before this approval.
 
+## Look (gate 3)
+
+Set `stage: look`.
+
+1. Right after gate 2, start Qwen3-TTS voicing and `adopt_voice.py` **in the background** (`references/handoff.md` § The order).
+2. While they run, write three looks for this subject into `looks/1-<slug>/`, `looks/2-<slug>/` and `looks/3-<slug>/` in the run folder (`<slug>` is the look's name in kebab case). Each folder holds:
+   - `LOOK.md`: the look's name, one line on why it fits this subject, and three lines in numbers, not adjectives, as `<hyperframes dir>/references/spec.md` describes them. `LOOK:` is the ground (hex, texture and how much), the ink, one accent and where it may appear, the display face with weight, size in px and tracking, the body face the same, the medium, light and depth. `MOTION:` is the eases by role (enter, move, exit), the durations, and how this medium moves (paper is cut and lifted, ink is printed). `BANNED:` is the defaults in `spec.md` § BANNED by default, plus what this look must not become;
+   - `index.template.html`: a copy of `assets/index.template.html`, restyled. The root variables, the `@font-face` rules and the shared classes change. The placeholders and `fx.at`, `fx.fact` and `fx.type` stay as they are. Add the moves the `MOTION` line names to `fx`, under new names, each a `fromTo` tween. The old fade moves (`blur`, `rise`, `slide`, `pop`, `fade`, `exit`) stay so older scenes still work; new scenes use the look's moves. No CSS filters and no `onUpdate`;
+   - `compositions/intro.html`: Frame 1 built in this look, with the approved title.
+3. The three looks differ. Each uses a different medium, a different display face and a ground from a different color family. None is one of the presets in `<hyperframes dir>/assets/frame-presets/` or the old `blue-professional` look. Each differs in medium and display face from the `SPEC.md` of the last five runs under `output_root`, newest first (skip a run with no `SPEC.md`).
+4. Fonts: only the families HyperFrames bundles (Inter, Montserrat, Outfit, Nunito, Oswald, League Gothic, Archivo Black, Space Mono, IBM Plex Mono, JetBrains Mono, EB Garamond, Playfair Display, Source Code Pro, Noto Sans JP, Roboto, Open Sans, Lato, Poppins) and Space Grotesk from `assets/fonts/`, in any weight. Inter, Space Grotesk and JetBrains Mono are never the display face.
+5. When `audio_meta.json` exists, render the samples, one intro per look:
+
+   ```bash
+   python3 -I <this skill's directory>/scripts/look_samples.py .
+   ```
+
+   `--look <folder name>` redoes one look. The script fails before any render when a look has a filter or an `onUpdate`, lacks a file, or cues a word the intro does not say; fix the look's own files and run it again.
+6. Open the three `looks/<n>-<slug>/intro.mp4` files for the user (`open` on macOS). For each, list its name, the line on why it fits, and its path. Put your recommendation first, with the reason in one clause.
+7. The user picks a look, asks for changes to one (rebuild that look and its sample only), or asks for three new ones. On the pick:
+   - copy `looks/<pick>/index.template.html` to `build/index.template.html` and `looks/<pick>/compositions/intro.html` to `compositions/intro.html`;
+   - write `SPEC.md` at the run folder root: the picked `LOOK.md` lines, plus `GOAL`, `OUTPUT` (1920 x 1080, 30 fps) and `TIME` from the run answers. `SHOTS` and `QA` are added once `STORYBOARD.md` exists. `SPEC.md` is a working file and is not hashed;
+   - record the approval in `RUN.md` (time, look name, SHA-256 of `looks/<pick>/LOOK.md`). Nothing edits `LOOK.md` after the pick.
+
+In yolo mode: `references/yolo.md`.
+
 ## Scenes
 
 Set `stage: scenes`. Everything from here is in `references/handoff.md`; read it now. In short:
 
-1. Right after gate 2, start Qwen3-TTS voicing and `adopt_voice.py` **in the background**, and write `STORYBOARD.md` and the scenes while they run. Cues need `audio_meta.json` only at build time.
+1. Voicing and `adopt_voice.py` were started in the background after gate 2. Write `STORYBOARD.md` while they run, and the scenes once the look is picked. Cues need `audio_meta.json` only at build time.
 2. `STORYBOARD.md`: one frame per script line, Frame 1 the intro with the approved title as `on_screen_title`, every other frame a `scene_job` and a `shape`, each frame's scene id as `src: compositions/<id>.html`. In interactive mode the user reviews the frame plan before the scenes are built; in yolo mode (`mode: autonomous`) there is no review.
-3. Build one scene per frame from `assets/scene.template.html` (the explainer route: one concrete example, a diagram that grows, the voice as the clock). Cue reveals on word text, `at("feed")`. No CSS filters. Music is `none`; captions follow the config `captions`.
+3. Build one scene per frame from `assets/scene.template.html`, in the picked look and from the frame's `shape` (`build/index.template.html` and `SPEC.md`; the explainer route: one concrete example, a diagram that grows, the voice as the clock). Cue reveals on word text, `at("feed")`. No CSS filters. Music is `none`; captions follow the config `captions`.
 4. Before the review, the claim check: every name, number, date, status or capability shown on screen must come from the approved digest or the sources, and its tense must match the point's status tag; ungrounded lines are reworded in the digest's terms.
 5. **Preview.** `scripts/finish.py . --review` voice-checks, builds, and looks at the scenes that changed: a layout and contrast check plus a still of each. Show the stills; do not render yet. A change request rebuilds the named scenes (plus any whose length changes), runs `--review` again and shows their stills. The one full render, `scripts/finish.py . --final`, runs after the user approves, or once at the end in yolo mode. A change that brings a new source follows `references/handoff.md` § Change requests.
 6. After the render `--final` has made the MP4, normalized its loudness, checked its format, black spans and length, put the intro title on frame 0 as the cover, and written the sync, QC and cover lines to `RUN.md`. Then write `renders/share-copy.txt`, set `stage: done`, and report the MP4 path, its length, the sync difference, the QC result, the cover time, the caption and the frame ids. A QC failure does not stop `--final`: it still adds the cover and the `RUN.md` lines, then exits non-zero. Ask the user what to do about it (yolo: list it in the report).
 
-**When a `finish.py` step fails** and the cause is in the run's own files, fix it and run the same command again, without asking: a cue on a word the line no longer says (cue on the word it says now), overflowing or low-contrast text, a CSS filter or an `onUpdate` callback in a scene, a `{{key}}` missing from `facts.json` whose value is in the approved digest. At most three tries per failure. A fix never changes the spoken text and never adds a fact the digest lacks: those go to the user (yolo: decide and list them in the report).
+**When a `finish.py` step fails** and the cause is in the run's own files, fix it and run the same command again, without asking: a cue on a word the line no longer says (cue on the word it says now), overflowing or low-contrast text, a CSS filter or an `onUpdate` callback in a scene (or in a look's own files, found by `look_samples.py`, with a cue on a word the intro lacks), a `{{key}}` missing from `facts.json` whose value is in the approved digest. At most three tries per failure. A fix never changes the spoken text and never adds a fact the digest lacks: those go to the user (yolo: decide and list them in the report).
 
 ## Stop conditions
 
@@ -163,4 +190,5 @@ Stop and tell the user, without improvising, when:
 - a file the skill needs is missing under `<hyperframes dir>` (name it) or `npx hyperframes check --help` fails;
 - a step would need the `hyperframes` skill loaded as a skill;
 - a voice check fails and the user declines to switch voice source;
+- `look_samples.py` still fails after three fixes to the look's own files;
 - a `finish.py` step still fails after three fixes, or its cause is not in the run's own files (a scene, the script, the voice): say which step and show the error.

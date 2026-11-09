@@ -21,7 +21,7 @@ When it prints nothing, ask once to install HyperFrames with `npx hyperframes sk
 Call the folder found `<hyperframes dir>` and record it in `RUN.md`. Then check these exist, and stop naming each one that does not:
 
 ```bash
-for f in SKILL.md references/types/explainer.md references/film.md references/format.md references/sound.md; do
+for f in SKILL.md references/types/explainer.md references/spec.md references/film.md references/format.md references/sound.md; do
   test -f "<hyperframes dir>/$f" || echo "missing: <hyperframes dir>/$f"
 done
 ```
@@ -31,8 +31,8 @@ Also stop when `npx hyperframes check --help` fails: the layout check and the st
 ## The order, with what overlaps
 
 1. Gate 2 approves `user_script.txt`. Run the script check (below), then start voicing and adopting **in the background**: Qwen3-TTS and the transcription take minutes and nothing below needs them until the build.
-2. Meanwhile write `STORYBOARD.md`, get the frame plan reviewed (interactive mode), and write the scenes. Cues need `audio_meta.json` only when `build_index.py` runs.
-3. When the voice is adopted: speech check, voice check, then `finish.py --review` and look at the stills.
+2. Meanwhile write the three looks (gate 3, `SKILL.md` § Look); when `audio_meta.json` exists run `scripts/look_samples.py` and show the samples. After the pick, write `STORYBOARD.md`, get the frame plan reviewed (interactive mode), and write the scenes. Cues need `audio_meta.json` only when `build_index.py` runs.
+3. When the voice is adopted (and the look is picked): speech check, voice check, then `finish.py --review` and look at the stills.
 4. After approval, `finish.py --final`.
 
 ## STORYBOARD.md
@@ -102,7 +102,7 @@ Changing a fact changes every scene on the next `finish.py` run. A spoken fact a
 
 Read `<hyperframes dir>/references/types/explainer.md` first: one idea, one concrete example worked through, a diagram that grows, the voice as the clock. Then build one scene per frame:
 
-1. Copy `assets/scene.template.html` to `compositions/<id>.html` and replace `SCENE_ID`. The shared vocabulary (`.stage`, `.eyebrow`, `.title`, `.card`, `.label`, `.num`, `.tag`...) and the `window.fx` helpers (`blur`, `rise`, `slide`, `pop`, `fade`, `grow`, `type`, `exit`, `at`, `fact`) live in the run's `index.html`, which `build_index.py` writes from `assets/index.template.html`. The template is the `blue-professional` preset with Space Grotesk (bundled in `assets/fonts/`, copied into the run by the build). For another preset, copy the template to `build/index.template.html` in the run and restyle it; `build_index.py` prefers that copy.
+1. Copy `assets/scene.template.html` to `compositions/<id>.html` and replace `SCENE_ID`. The run's look is `build/index.template.html` (copied from the picked look) and `SPEC.md`: scenes use its classes and the moves its `MOTION` line names. `build_index.py` writes the run's `index.html` from that copy. The old fade moves (`blur`, `rise`, `slide`, `pop`, `fade`, `exit`) stay only so older scenes still work.
 2. **Cue by word text.** `at("feed")` is the start of the first "feed" in the line, `at("draft", 2)` of the second. It survives edits to the words before it. `w(i)` (by word index) still works but breaks when words are added. `build_index.py` checks every `at()` against the line's words and fails the build for a word that is not there.
 3. **Nothing that stops fast capture.** No CSS filters (`blur`, `drop-shadow`, `backdrop-filter`): one makes the renderer fall back from fast capture to screenshot capture. `fx.blur` is a fade with a small rise and `fx.exit` a fade with a lift; use opacity and `y`. And every effect is a tween of elements, never a callback that edits the page (`onUpdate` writing `textContent`): callbacks do not run on a seek, so a frame captured by a jump differs from the sequential one, fast capture's self-check fails and the whole render restarts the slow way. `fx.type` types with one span per character for that reason. `finish.py` fails on a `blur(` with a size and on `onUpdate:`.
 4. Every name, number, date, status or capability on screen comes from the approved digest or `sources/`, and the tense matches the point's status tag (claim check, below). A concept a `next` scene names gets one sentence on what it will do (`references/style.md`).
@@ -189,7 +189,7 @@ python3 -I <this skill's directory>/scripts/finish.py . --review
 python3 -I <this skill's directory>/scripts/finish.py . --final
 ```
 
-- `--review` (seconds): adopt, voice check, `build_index.py`, the blur lint, then `npx hyperframes check --at <times>` and `npx hyperframes snapshot --at <times> --no-end` on the scenes that changed since the last finish run. The times are the last 0.5 s of each changed scene. A scene counts as changed when its WAV hash or its `compositions/<id>.html` modification time differs from the state recorded under `## Finish state` in `RUN.md`, or when `facts.json` changed. An overflow, a lint error or a contrast failure fails the step. The stills are in `review/snapshots/`: show them to the user. This is the review loop: no full render.
+- `--review` (seconds): adopt, voice check, `build_index.py`, the blur lint, then `npx hyperframes check --at <times>` and `npx hyperframes snapshot --at <times> --no-end` on the scenes that changed since the last finish run. The times are the last 0.5 s of each changed scene. A scene counts as changed when its WAV hash or its `compositions/<id>.html` modification time differs from the state recorded under `## Finish state` in `RUN.md`, or when `facts.json` changed. An overflow, a lint error or a contrast failure fails the step. Before showing the stills, review them against the look. Check each still against `SPEC.md`'s BANNED line and the "Tells for this type" in `<hyperframes dir>/references/types/explainer.md`: a slide of bullets, icons in circles, three cards in a row, the whole diagram at once, the narrator's sentence on screen word for word, every element fading and rising. Fix each one found, run `--review` again, at most two rounds. A default you find that BANNED lacks goes on `SPEC.md`'s BANNED line. The stills are in `review/snapshots/`: show them to the user and name what was fixed. This is the review loop: no full render.
 - `--final` (one render): adopt, voice check, build, the blur lint, `npx hyperframes render . -o renders/video.raw.mp4`, then `renders/video.mp4` from it with the loudness normalized to -16 LUFS (`scripts/qc_video.py --normalize`), the video QC (`qc_video.py --check <target>`: H.264 `yuv420p` at 1920x1080, an audio stream, no black span of 0.5 s or more, length within 12% of the target), the cover, and the sync, QC and cover lines appended to `RUN.md`. The target comes from `- target:` under Answers in `RUN.md` (seconds, or a range like `60-90`; yolo: `75`), or `--target`.
 
 The cover: chat apps and most players show a video's first frame as the thumbnail, and a raw render starts on a fade. `--final` pulls a frame about 60% through Frame 1's voice (the title fully on screen) into `renders/cover.jpg` and overlays it on frame 0 only; the length and the audio stay the same. Look at `renders/cover.jpg`; when the title is still animating in or a transition shows, move the time by 0.3 seconds and make it again by hand with `ffmpeg -ss <s> -i renders/video.raw.mp4 -frames:v 1 -q:v 2 renders/cover.jpg` and the same overlay filter.
@@ -206,7 +206,7 @@ A sync difference above 2 seconds (voice total against the MP4's length) is writ
 
 ## Change requests
 
-A change request at the preview rebuilds only the scenes the user names, plus any scene whose length changes. It never starts a full render.
+A change request at the preview rebuilds only the scenes the user names, plus any scene whose length changes. It never starts a full render. "Another look" re-opens gate 3 (three new looks, or changes to one with `look_samples.py --look <folder>`), and then every scene is rebuilt.
 
 1. Edit the named `compositions/<id>.html`. When a scene's spoken text changed: update that line in `user_script.txt` only, record its new SHA-256 and the change time in `RUN.md` as the user's approval of that edit, re-voice it (Qwen3-TTS: `--frames <N>`, or `--frames-with <word>` for a pronunciation fix; own engine: replace `voice-in/NN.<ext>`, or `voice-in/NN.K.<ext>` for each turn of a discussion line).
 2. Run `finish.py . --review`. Show the stills of the changed scenes. A length change moves every later scene; the cues follow the words, so only a scene whose own words changed needs editing.
