@@ -11,7 +11,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = [ROOT / "SKILL.md", ROOT / "README.md", *sorted((ROOT / "references").glob("*.md"))]
 # Files of the installed HyperFrames skill that these docs name on purpose (the dependency check in handoff.md).
-EXTERNAL = {"references/film.md", "references/format.md", "references/sound.md", "references/spec.md"}
+EXTERNAL = {"references/film.md", "references/format.md", "references/runtimes.md", "references/sound.md",
+            "references/spec.md"}
 FONTS = {"Inter", "Montserrat", "Outfit", "Nunito", "Oswald", "League Gothic", "Archivo Black", "Space Mono",
          "IBM Plex Mono", "JetBrains Mono", "EB Garamond", "Playfair Display", "Source Code Pro", "Noto Sans JP",
          "Roboto", "Open Sans", "Lato", "Poppins", "Space Grotesk"}
@@ -127,6 +128,16 @@ class SkillStructureTests(unittest.TestCase):
         self.assertIn("## Not used, and why", text)
         self.assertIn("## Default avoid list", text)
         self.assertIn("awesomeclaude.ai", text)
+
+    def test_gate_3_uses_the_catalog(self):
+        skill = (ROOT / "SKILL.md").read_text()
+        self.assertIn("references/motion-styles.md", skill)
+        self.assertIn("STYLE:", skill)
+        self.assertIn("three different", (ROOT / "references/motion-styles.md").read_text())
+        self.assertIn("references/motion-styles.md", (ROOT / "references/yolo.md").read_text())
+        loop = re.search(r"^for f in (.+?); do$", (ROOT / "references/handoff.md").read_text(), re.M).group(1).split()
+        self.assertIn("references/runtimes.md", loop)
+        self.assertIn("references/types/3d.md", loop)
 
 
 if __name__ == "__main__":
