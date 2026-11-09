@@ -112,6 +112,14 @@ class LookSamplesTests(unittest.TestCase):
         self.assertIn("looks/1-paper/index.template.html", err)
         self.assertEqual(self.calls, [])
 
+    def test_webgl_in_look_template_fails_before_render(self):
+        t = self.p / "looks/1-paper/index.template.html"
+        t.write_text(t.read_text().replace("window.fx = {", 'window.fx = {\n  gl() { return c.getContext("webgl"); },'))
+        code, err = self.main_err()
+        self.assertEqual(code, 1)
+        self.assertIn("WebGL forces screenshot capture", err)
+        self.assertEqual(self.calls, [])
+
     def test_screenshot_fallback_is_reported(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):

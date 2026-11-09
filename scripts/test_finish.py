@@ -140,6 +140,17 @@ class FinishTests(unittest.TestCase):
         self.assertIn("compositions/feed.html:2", err)
         self.assertNotIn("feed.html:1", err)
 
+    def test_lint_fails_webgl(self):
+        (self.p / "compositions/feed.html").write_text(
+            'const g = c.getContext("2d");\nconst w = c.getContext("webgl2");\n'
+            'import * as T from "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";')
+        code, _, err, _ = self.run_finish("--review")
+        self.assertEqual(code, 1)
+        self.assertIn("WebGL forces screenshot capture", err)
+        self.assertIn("compositions/feed.html:2", err)
+        self.assertIn("compositions/feed.html:3", err)
+        self.assertNotIn("feed.html:1", err)
+
     def test_blur_lint_catches_css_filters_in_index_html(self):
         (self.p / "index.html").write_text("<style>.x { backdrop-filter: blur(var(--r)); }</style>")
         self.assertEqual(self.run_finish("--review")[0], 1)
