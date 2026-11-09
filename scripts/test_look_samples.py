@@ -128,6 +128,15 @@ class LookSamplesTests(unittest.TestCase):
         self.assertTrue((sample / "meta.json").exists())
         self.assertFalse((sample / "package.json").exists())
 
+    def test_sample_gets_the_runs_fetched_fonts(self):
+        fonts = self.p / "assets/fonts"
+        fonts.mkdir()
+        (fonts / "press-start-2p-400.woff2").write_bytes(b"font")
+        self.main()
+        for name in ("1-paper", "2-blueprint"):
+            copied = self.p / "looks" / name / "sample/assets/fonts/press-start-2p-400.woff2"
+            self.assertEqual(copied.read_bytes(), b"font")
+
     def test_rerun_replaces_the_sample(self):
         self.main()
         (self.p / "looks/1-paper/sample/stale.txt").write_text("x")

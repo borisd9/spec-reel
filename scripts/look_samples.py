@@ -61,6 +61,8 @@ def build_sample(p, look):
     for name in ("facts.json", *PROJECT_FILES):
         if (p / name).exists():
             shutil.copy(p / name, sample / name)
+    if (p / "assets/fonts").is_dir():
+        shutil.copytree(p / "assets/fonts", sample / "assets/fonts", dirs_exist_ok=True)
     build_index.build(sample)
     return sample
 
