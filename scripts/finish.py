@@ -97,6 +97,17 @@ def sample_times(scenes, changed):
 
 # --- the steps -----------------------------------------------------------------------------------
 
+def fast_capture_problems(files, root):
+    """The fast-capture lint messages for `files` (paths shown relative to `root`); missing files are skipped."""
+    lines = [(f"{f.relative_to(root)}:{n}", line) for f in files if f.exists()
+             for n, line in enumerate(f.read_text().splitlines(), 1)]
+    blur = [where for where, line in lines if BLUR.search(line)]
+    callbacks = [where for where, line in lines if CALLBACK.search(line)]
+    return (["filter blur() turns fast capture off; use opacity and y instead: " + ", ".join(blur)] if blur else []) \
+        + (["onUpdate callbacks are not seek-safe and make fast capture fall back; build the effect from tweens of "
+            "elements (see fx.type): " + ", ".join(callbacks)] if callbacks else [])
+
+
 class Finish:
     def __init__(self, p, runner, probe, pause_s, target):
         self.p, self.run, self.probe, self.pause_s, self.target = p, runner, probe, pause_s, target
@@ -115,14 +126,7 @@ class Finish:
 
     def lint_fast_capture(self):
         files = [self.p / "index.html", *sorted((self.p / "compositions").glob("*.html"))]
-        lines = [(f"{f.relative_to(self.p)}:{n}", line) for f in files if f.exists()
-                 for n, line in enumerate(f.read_text().splitlines(), 1)]
-        blur = [where for where, line in lines if BLUR.search(line)]
-        callbacks = [where for where, line in lines if CALLBACK.search(line)]
-        problems = (["filter blur() turns fast capture off; use opacity and y instead: " + ", ".join(blur)] if blur else []) \
-            + (["onUpdate callbacks are not seek-safe and make fast capture fall back; build the effect from tweens of "
-                "elements (see fx.type): " + ", ".join(callbacks)] if callbacks else [])
-        return "; ".join(problems) or None
+        return "; ".join(fast_capture_problems(files, self.p)) or None
 
     def load(self):
         self.scenes = load_scenes(self.p)
