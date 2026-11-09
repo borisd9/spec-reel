@@ -95,7 +95,7 @@ New stage `look`, between `script` and `scenes`. The stage line in `RUN.md` beco
    - `compositions/intro.html`: Frame 1 built in this look, with the approved title (the same rules as every scene).
 3. **The three looks differ.** Each uses a different medium, a different display face and a ground from a different
    color family. None is one of the 13 presets in `<hyperframes dir>/assets/frame-presets/` or the old
-   `blue-professional` look. Each one differs in medium and display face from the `SPEC.md` of the last five runs under
+   `blue-professional` look. Each one differs in medium and display face from the `SPEC.md` of the last three runs under
    config `output_root` (newest first, runs without a `SPEC.md` skipped).
 4. **The samples.** When `audio_meta.json` exists, `scripts/look_samples.py .` builds a one-frame project per look and
    renders it: `looks/<n>-<slug>/sample/` holds an `index.html` from that look's template with only Frame 1, its voice
@@ -115,7 +115,7 @@ New stage `look`, between `script` and `scenes`. The stage line in `RUN.md` beco
 7. **Resume.** A changed `looks/<pick>/LOOK.md` re-opens gate 3, then rebuilds every scene. A changed
    `user_script.txt` re-opens gate 2 but keeps the picked look: the intro scene is rebuilt in it when line 1 changed,
    and no new samples are made. Gate 3 re-opens after that only when the user asks for another look.
-8. **Yolo.** Write the three looks, skip the samples, take the recommended one, record
+8. **Yolo.** Write the three looks, render only the recommended one's sample (the next look when it fails), take it, record
    `gate 3 (look): auto (yolo) <time> <look name> sha256 <hash>`, and name the other two in the report's
    **Decided without you** section, one line each.
 
@@ -170,7 +170,7 @@ one found, run `--review` again, then show the stills. At most two rounds. Name 
 - How `look_samples.py` gives `build_index.build` a one-frame project (copying files into `sample/`, or a small
   argument on `build`), as long as `build_index.py`'s current behavior and tests stay the same.
 - The wording of the new `SKILL.md` and `handoff.md` sections, in the style of the files around them.
-- How the last five runs' `SPEC.md` files are found and compared (the agent reads them; no script is required).
+- How the last three runs' `SPEC.md` files are found and compared (the agent reads them; no script is required).
 
 ## My calls (not yet confirmed by the user)
 
