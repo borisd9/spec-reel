@@ -103,6 +103,29 @@ class LookSamplesTests(unittest.TestCase):
         self.assertIn("looks/1-paper/index.template.html", err)
         self.assertEqual(self.calls, [])
 
+    def test_random_in_look_template_fails_before_render(self):
+        t = self.p / "looks/1-paper/index.template.html"
+        t.write_text(t.read_text().replace("window.fx = {", "window.fx = {\n  jitter() { return Math.random(); },"))
+        code, err = self.main_err()
+        self.assertEqual(code, 1)
+        self.assertIn("Math.random is not seek-safe", err)
+        self.assertIn("looks/1-paper/index.template.html", err)
+        self.assertEqual(self.calls, [])
+
+    def test_screenshot_fallback_is_reported(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = ls.main([str(self.p), "--look", "1-paper"], render=lambda cmd, cwd: (0, "... falling back to screenshot ..."))
+        self.assertEqual(code, 0)
+        self.assertIn("slower render", out.getvalue())
+
+    def test_screenshot_fallback_is_reported_in_the_cli_wording(self):
+        log = "[engine] fast capture falls back to screenshot capture: webgl-context detected"
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            ls.main([str(self.p), "--look", "1-paper"], render=lambda cmd, cwd: (0, log))
+        self.assertIn("slower render", out.getvalue())
+
     def test_cue_on_a_word_the_intro_lacks_fails(self):
         (self.p / "looks/1-paper/compositions/intro.html").write_text('<template><script>at("missing");</script></template>')
         code, err = self.main_err()
