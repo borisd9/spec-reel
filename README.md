@@ -161,7 +161,7 @@ Every pull request runs `.github/workflows/checks.yml`: these tests on Linux and
 
 The cover frame, the share caption and the on-screen claim check are adapted from [brag](https://github.com/latent-spaces/brag) by Shunit Haviv Hakimi (MIT).
 
-Styles adapted from Awesome Claude (https://awesomeclaude.ai/claude-motion-graphics, github.com/webfuse-com/awesome-claude, CC0-1.0; site footer says MIT).
+Styles adapted from Awesome Claude (https://awesomeclaude.ai/claude-motion-graphics, github.com/webfuse-com/awesome-claude, CC0-1.0; site footer says MIT) and from [bang-motion](https://github.com/bangtutorial/bang-motion) (MIT, © 2026 Bang Tutorial). Full notices, including the MIT text: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Change-line, style and scene-card rules adapted from [marketingskills](https://github.com/coreyhaines31/marketingskills) (MIT, Corey Haines) and [story-skills](https://github.com/danjdewhurst/story-skills) (MIT).
 

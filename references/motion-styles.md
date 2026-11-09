@@ -1,6 +1,6 @@
 # Motion styles
 
-Styles adapted from Awesome Claude (https://awesomeclaude.ai/claude-motion-graphics, github.com/webfuse-com/awesome-claude, CC0-1.0; site footer says MIT).
+Styles adapted from Awesome Claude (https://awesomeclaude.ai/claude-motion-graphics, github.com/webfuse-com/awesome-claude, CC0-1.0; site footer says MIT) and from bang-motion (https://github.com/bangtutorial/bang-motion, MIT, © 2026 Bang Tutorial). The licenses and the list of adapted styles are in `THIRD_PARTY_NOTICES.md`. Each section's `source` line names where it came from.
 
 Gate 3 (`SKILL.md` § Look (gate 3)) builds each of its three looks from one style on this page. A style is numbers: a palette, fonts, a runtime, eases, timings, rules, an avoid list and a style prompt. A look copies them and changes only what `## Picking three` allows.
 
@@ -14,6 +14,7 @@ Conventions:
 - Fonts are any Google Fonts family. A family outside the HyperFrames bundle is downloaded with `scripts/fetch_font.py` (`SKILL.md` § Look (gate 3)). Inter, Space Grotesk and JetBrains Mono are never the display face.
 
 ## swiss — Swiss grid & kinetic type
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#swiss
 - group: graphic
 - fits: brand and event openers, titles, one-subject statements
 - palette: ground #f5f2ea · ink #111111 · accent #e63323
@@ -25,6 +26,7 @@ Conventions:
 - prompt: Style: Swiss International motion design. Off-white #f5f2ea, black #111, one signal red #e63323 used on a single element per shot. One grotesk typeface in two weights. A visible 12-column grid with 4% margins; every element snaps to it. Snaps use cubic-bezier(.7,0,.2,1), lines draw at linear speed. Entrances are wipes and clip reveals, never fades; exits are hard cuts on the beat. No overshoot, no shadows, no gradients. Type: Roboto 900 for display, Roboto 500 for body.
 
 ## flat-vector — Flat vector explainer
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#flat-vector
 - group: explain
 - fits: product and process explainers, onboarding steps, how-it-works
 - palette: ground #fdf6ec · ink #2b2d42 · accent #ff6b35 · shade #4ecdc4 · shade #ffd23f
@@ -36,6 +38,7 @@ Conventions:
 - prompt: Style: flat vector explainer. Palette #fdf6ec background, #2b2d42 ink, accents #ff6b35, #4ecdc4, #ffd23f. Geometric shapes and simple characters built from circles and rounded rectangles, no gradients. Entrances overshoot with cubic-bezier(0.34,1.56,0.64,1) and settle within 12 frames, groups stagger by 3 frames. Scene changes are carried by a shape that grows to fill the frame and becomes the next background. No crossfades. Type: Poppins 700 for display, Nunito 600 for body.
 
 ## morph — Shape morph & liquid
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#morph
 - group: graphic
 - fits: topic-to-topic stories, a concept that turns into another, brand narratives
 - palette: ground #0d1b2a · accent #f72585 · shade #7209b7 · shade #4cc9f0
@@ -47,6 +50,7 @@ Conventions:
 - prompt: Style: continuous shape morph. Dark #0d1b2a field, shapes in #f72585, #7209b7, #4cc9f0. No cuts: each idea grows out of the previous shape through a readable in-between form over 18 to 30 frames, then holds for at least 1 second. Liquid moments use metaball blending so drops merge smoothly. Camera stays still; the shapes do the moving. Type: League Gothic 400 for display, Lato 400 for body.
 
 ## line-draw — Single line & live drawing
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#line-draw
 - group: drawn
 - fits: minimal explainers, a path or journey, whiteboard-style steps
 - palette: ground #faf7f0 · ink #1a1a1a · accent #c1121f
@@ -58,6 +62,7 @@ Conventions:
 - prompt: Style: single continuous line drawing. Warm paper #faf7f0, ink #1a1a1a, one accent #c1121f. One line, round caps, constant 4px width, draws itself at a steady linear speed of about 800px/s and never lifts; each picture becomes the next by continuing the line. The camera pans to keep the pen tip in the middle third. One moment where a closed shape floods with the accent colour on a beat. Type: Playfair Display 600 for display, EB Garamond 400 for body.
 
 ## dataviz — Data story
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#dataviz
 - group: explain
 - fits: numbers, metrics, before and after, reports
 - palette: ground #fffdf7 · ink #222222 · accent #d62828 · shade #457b9d
@@ -69,6 +74,7 @@ Conventions:
 - prompt: Style: editorial data storytelling. Cream #fffdf7, ink #222, one highlight red #d62828 for the series that matters, muted blue #457b9d for the rest. One reading per screen. Bars and lines grow from the baseline over 20 frames with ease-out, counters roll to the exact value and stop dead. One handwritten-style annotation per chart says why the change matters. Labels at least 28px. Use only numbers from the data provided. Type: Playfair Display 700 for display, Lato 400 for body, IBM Plex Mono 500 for numbers.
 
 ## isometric — Isometric miniature world
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#isometric
 - group: dimensional
 - fits: architecture and system diagrams, flows between parts, feature maps
 - palette: ground #eef2f3 · ink #2d3142 · accent #ef8354 · shade #4f5d75 · shade #bfc0c0
@@ -80,6 +86,7 @@ Conventions:
 - prompt: Style: isometric miniature world. Orthographic camera at true isometric angles; it slides but never rotates into perspective. Background #eef2f3, ink #2d3142, accent #ef8354, shades #4f5d75 and #bfc0c0. Every block has three flat tones: light top, mid left, dark right. Pieces drop in from 40px above with a small bounce, staggered by 3 frames. To explain a step, lift the roof off a building and show the process inside. Labels use thin leader lines. Type: Montserrat 700 for display, Open Sans 500 for body.
 
 ## dark-keynote — Dark tech keynote
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#dark-keynote
 - group: explain
 - fits: launches, feature reveals, one big number, AI and SaaS topics
 - palette: ground #0a0a0a · ink #f5f5f5 · shade #8b8b8b · accent #ff5a1f
@@ -91,6 +98,7 @@ Conventions:
 - prompt: Style: dark tech keynote. Near-black #0a0a0a stage with a faint hairline grid, white #f5f5f5 type, grey #8b8b8b secondary, one accent #ff5a1f on a single element. Slow long-tail easing cubic-bezier(.16,1,.3,1), 30 to 45 frames per move. Objects are revealed by a soft light sweep rather than fades. One giant number at 30% of frame height counts up to its exact value. No lens flares, no glow, no particles. Type: Outfit 600 for display, Inter 400 for body.
 
 ## screencast — Living UI screencast
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#screencast
 - group: explain
 - fits: product tutorials, how a tool is used, changelogs, UI walkthroughs
 - palette: ground #ffffff · shade #f3f4f6 · ink #111827 · accent #2563eb
@@ -102,6 +110,7 @@ Conventions:
 - prompt: Style: living screencast. Rebuild the interface in HTML and CSS with its real copy, fonts and colours; no screenshots. A cursor moves on eased curves over 20 to 30 frames, pauses 8 frames, clicks with a small ripple. The camera zooms to 1.6x on each detail that matters, then pulls back. One action every 3 to 4 seconds. Do not show any feature that the product does not have. Type: Roboto 700 for display, Inter 400 for body.
 
 ## hud — HUD & terminal
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#hud
 - group: retro
 - fits: developer tools, specs and pipelines, status and numbers on a dark field
 - palette: ground #050b0f · ink #38e8ff · accent #ffb000 · shade #1d3540
@@ -113,6 +122,7 @@ Conventions:
 - prompt: Style: technical HUD. Dark #050b0f field, cyan #38e8ff primary, amber #ffb000 for warnings, dim #1d3540 grid. All type monospace on a character grid. Numbers scramble through glyphs for 6 to 10 frames then lock to the true value. Target brackets lock in three steps with a tick. Thin 1.5px lines, no bloom, no glitch tearing, every label readable at 1080p. Type: Space Mono 700 for display, IBM Plex Mono 400 for body.
 
 ## painterly — Watercolour & ink
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#painterly
 - group: drawn
 - fits: stories, places, culture and people topics, soft explainers with little text
 - palette: ground #f4efe6 · ink #2f3e46 · accent #bc4749 · shade #6a994e · shade #a7c4d2
@@ -124,6 +134,7 @@ Conventions:
 - prompt: Style: watercolour and ink on paper. Warm paper #f4efe6 with visible grain, ink #2f3e46, washes in #bc4749, #6a994e, #a7c4d2. Paint every element with brush strokes, never plain shapes. Washes spread over 15 to 25 frames and bleed slightly past the ink. Linework wobbles on twos (re-seeded 12 times per second from a fixed seed). No pure white, no pure black, very little text. Type: EB Garamond 500 for display, Lato 400 for body.
 
 ## print — Risograph & halftone print
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#print
 - group: drawn
 - fits: zines and posters, indie and event announcements, bold two-colour stories
 - palette: ground #f3ede2 · accent #ff48b0 · shade #0078bf · shade #ffe800
@@ -135,6 +146,7 @@ Conventions:
 - prompt: Style: risograph print. Warm paper #f3ede2. Two spot inks, fluorescent pink #ff48b0 and blue #0078bf (optional yellow #ffe800), overprinted with multiply blending. Each ink plate is misregistered 2 to 4px and stays offset. All tones are halftone dots, never smooth gradients. Animation steps at 12fps while the camera stays smooth. Type: Archivo Black 400 for display, Space Mono 400 for body.
 
 ## papercut — Paper cut-out & collage
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#papercut
 - group: drawn
 - fits: editorial and playful stories, people and objects as pieces, layered scenes
 - palette: ground #e9e3d5 · ink #1b1b1b · accent #e76f51 · shade #2a9d8f · shade #f4a261
@@ -146,6 +158,7 @@ Conventions:
 - prompt: Style: paper cut-out collage. Card colours #e9e3d5, #e76f51, #2a9d8f, #f4a261 with black #1b1b1b details. Every piece has a slightly rough white cut edge and a small hard shadow on the layer below. Characters move in stop-motion steps at 12fps with split-pin joints; the camera drifts smoothly across 3 to 6 parallax layers. Type: Oswald 700 for display, Nunito 600 for body.
 
 ## cel — Hand-drawn line boil
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#cel
 - group: drawn
 - fits: playful explainers, diagrams, arrows and icons that feel drawn by hand
 - palette: ground #fffaf0 · ink #1c1c1c · accent #ff595e · shade #1982c4 · shade #ffca3a
@@ -157,6 +170,7 @@ Conventions:
 - prompt: Style: hand-drawn cartoon with line boil. Off-white #fffaf0, ink #1c1c1c, flat fills #ff595e, #1982c4, #ffca3a. 24fps animated on twos. Every line has 3 jitter variants cycled so it boils. Fast moves use a smear frame, every big action gets 4 to 6 frames of anticipation, faces act. Variable-width ink lines, no perfect geometric shapes, almost no text. Type: Outfit 800 for display, Nunito 600 for body. No characters unless a source has one: the linework boils on diagrams, arrows and icons.
 
 ## pixel — Pixel art & retro game
+- source: Awesome Claude, https://awesomeclaude.ai/claude-motion-graphics#pixel
 - group: retro
 - fits: nostalgia and game-like stories, year in review, step-by-step levels
 - palette: ground #1a1c2c · shade #5d275d · shade #b13e53 · accent #ef7d57 · shade #ffcd75 · shade #a7f070 · shade #38b764 · shade #41a6f6

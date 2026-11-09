@@ -13,7 +13,7 @@ DOCS = [ROOT / "SKILL.md", ROOT / "README.md", *sorted((ROOT / "references").glo
 # Files of the installed HyperFrames skill that these docs name on purpose (the dependency check in handoff.md).
 EXTERNAL = {"references/film.md", "references/format.md", "references/runtimes.md", "references/sound.md",
             "references/spec.md"}
-STYLE_KEYS = ["group", "fits", "palette", "fonts", "runtime", "motion", "rules", "avoid", "prompt"]
+STYLE_KEYS = ["source", "group", "fits", "palette", "fonts", "runtime", "motion", "rules", "avoid", "prompt"]
 HF_SEEK = {"painterly", "pixel", "cel"}
 BANNED = ("faceless-explainer", "Skill tool", "run_in_background")
 # A path into one agent's HyperFrames copy; the search loop in handoff.md names folders without a trailing slash.
@@ -112,6 +112,8 @@ class SkillStructureTests(unittest.TestCase):
                                          "dark-keynote", "screencast", "hud", "print", "papercut", *HF_SEEK})
         for sid, body in sections.items():
             self.assertEqual(re.findall(r"^- (\w+):", body, re.M), STYLE_KEYS, sid)
+            self.assertRegex(re.search(r"^- source: (.+)$", body, re.M).group(1),
+                             r"awesomeclaude\.ai|github\.com/bangtutorial/bang-motion")
             fonts = re.search(r"^- fonts: (.+)$", body, re.M).group(1)
             display = re.match(r"display ([A-Za-z ]+?) \d", fonts).group(1)
             self.assertNotIn(display, {"Inter", "Space Grotesk", "JetBrains Mono"}, sid)
@@ -124,6 +126,13 @@ class SkillStructureTests(unittest.TestCase):
         self.assertIn("## Not used, and why", text)
         self.assertIn("## Default avoid list", text)
         self.assertIn("awesomeclaude.ai", text)
+
+    def test_third_party_notices(self):
+        notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text()
+        for needle in ("Copyright (c) 2026 Bang Tutorial", "Permission is hereby granted, free of charge",
+                       "bangtutorial/bang-motion", "awesomeclaude.ai"):
+            self.assertIn(needle, notices)
+        self.assertIn("THIRD_PARTY_NOTICES.md", (ROOT / "README.md").read_text())
 
     def test_gate_3_uses_the_catalog(self):
         skill = (ROOT / "SKILL.md").read_text()
