@@ -125,6 +125,7 @@ Write `user_script.txt` at the run folder root. It is the only script file you e
 - header line `**Voice:**` naming "Qwen3-TTS · <config qwen_speaker>", "Qwen3-TTS · cloned voice", or "your own engine" for the own source; in a discussion, `**Voices:** A — <voice>; B — <voice>` instead, each voice named the same way;
 - one section per spoken line: `## Line N — <label> (Frame N)`, then `**Time:**`, then `**Delivery:**`, then the spoken text indented four spaces; in a discussion line `**Time:**` and `**Delivery:**` come right after the line heading, before the first turn;
 - the first line is always the intro, `## Line 1 — Intro (Frame 1)`: one short sentence (at most 20 words) saying what this video is about, for example "This is a quick tour of the new upload flow and what it means for your team." Its scene shows the approved title. The user may reword the intro but not remove it;
+- every other line has at most 30 spoken words; in a discussion its turns count together;
 - with a demo, one `## Line N — Demo (Frame N)` line per demo file, in the "what it changes" part, describing what the viewer sees on it (`references/demo.md`); in a discussion it has no turn heading and A speaks it; without a demo, no Demo line;
 - Line N and Frame N carry the same number, counting up one per line from 1;
 - total length within the target length: the words at about 150 words per minute, plus `slide_pause_s` after every line but the last (in a discussion, also `TURN_GAP_S` (`scripts/adopt_voice.py`, 0.3 s) between the turns of a line);

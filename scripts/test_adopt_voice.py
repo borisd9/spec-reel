@@ -687,6 +687,29 @@ class CheckScriptTests(Base):
             self.assertEqual(code, 0 if ok else 1, err)
             self.assertEqual("at most 20 words" in err, not ok)
 
+    def test_line_longer_than_30_words(self):
+        long = " ".join(["word"] * 31) + "."
+        script = INTRO_SCRIPT.replace("Shipped the thing.", long)
+        code, err = self.check(script)
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2: 31 spoken words; a scene has at most 30", err)
+
+    def test_line_of_exactly_30_words_passes(self):
+        script = INTRO_SCRIPT.replace("Shipped the thing.", " ".join(["word"] * 30) + ".")
+        self.assertEqual(self.check(script)[0], 0)
+
+    def test_line_counts_written_words(self):
+        # "P R" is the spoken form of "PR": unrespell counts it as one written word
+        text = "We merged P R 12 " + " ".join(["word"] * 26) + "."  # 30 written words
+        self.assertEqual(self.check(INTRO_SCRIPT.replace("Shipped the thing.", text))[0], 0)
+
+    def test_discussion_line_counts_all_turns(self):
+        turns = "".join(f"### Turn — {s}\n    " + " ".join(["word"] * 8) + ".\n" for s in "ABAB")  # 32 words
+        body = DISCUSSION.split("## Line 2")[0] + "## Line 2 — Retries (Frame 2)\n" + turns + "## Line 3 — End (Frame 3)\n    Next up is more.\n"
+        code, err = self.discussion(body)
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2: 32 spoken words; a scene has at most 30", err)
+
     def test_risky_words_warn_without_failing(self):
         risky = INTRO_SCRIPT.replace("Shipped the thing.", "Shipped kb_sync on PR412.")
         (self.p / "SCRIPT.md").write_text(risky)

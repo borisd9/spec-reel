@@ -40,6 +40,7 @@ VOICEOVER_RE = re.compile(r"^\s*[-*]\s+(?:voiceover|vo|voice_over|narration)\s*:
 INTRO_HEADING = re.compile(r"^#{2,3}\s+line\s+1\s+\W+\s*intro\s*\(frame\s+1\)", re.I | re.M)
 TITLE_RE = re.compile(r"^\s*[-*]\s+on_screen_title\s*:\s*(.+?)\s*$", re.I)
 MAX_INTRO_WORDS = 20
+MAX_LINE_WORDS = 30
 # Discussion lines: `### Turn — A|B` headings under a line; the turn files are voice-in/NN.K.<ext>.
 TURN_HEADING = re.compile(r"^#{3}\s+turn\s+\W+\s*([AB])\s*$", re.I)
 TURN_ANY = re.compile(r"^#{3}\s+turn\b", re.I)
@@ -512,6 +513,10 @@ def check_script(p):
     elif not 0 < len(unrespell(approved[0][1]).split()) <= MAX_INTRO_WORDS:
         # the written words: "P R" counts as the one word "PR", a hyphenated word as one
         problems.append(f"frame 1: the intro is one short sentence of at most {MAX_INTRO_WORDS} words")
+    for frame, text in approved:
+        n = len(unrespell(text).split())
+        if n > MAX_LINE_WORDS:
+            problems.append(f"frame {frame}: {n} spoken words; a scene has at most {MAX_LINE_WORDS}")
     problems += turn_problems(approved_md)
     storyboard = scripts["STORYBOARD.md"].read_text() if scripts["STORYBOARD.md"].exists() else None
     demos = sorted(f.name for f in (p / "public").glob("demo-*"))
