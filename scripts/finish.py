@@ -40,13 +40,14 @@ RANDOM = re.compile(r"^(?!\s*//).*\bMath\.random\s*\(")
 # A WebGL context always makes the renderer fall back to screenshot capture, about 2x slower.
 WEBGL = re.compile(r"""getContext\(\s*["'](?:webgl2?|experimental-webgl)["']|\bthree(?:\.module)?(?:\.min)?\.js\b""")
 # The parallel drawElement router renders a 3-minute, 17-scene video in 45 s against 1 m 55 s for one worker, with the
-# same frames (PSNR 72 dB) and the same self-checks. HF_FAST_CAPTURE_INTERVAL_SS=false keeps clipPath wipes on fast
-# capture; without it HyperFrames screenshots their frames and holds the render to one worker (200 s against 63 s,
-# lowest frame 53.5 dB). The other properties that gate catches are failed by SCREENSHOT below.
+# same frames (PSNR 72 dB) and the same self-checks. HF_FAST_CAPTURE_INTERVAL_SS=false turns off HyperFrames' whole
+# timeline at-risk check, for every property it covers, not only clipPath. clipPath was measured safe: with the check
+# on, HyperFrames screenshots wipe frames and holds the render to one worker (200 s against 63 s, lowest frame 53.5 dB).
 RENDER_ENV = {"HF_DE_PARALLEL_ROUTER": "true", "HF_FAST_CAPTURE_INTERVAL_SS": "false"}
-# These send frames, or the whole render, to screenshot capture, which RENDER_ENV does not cover.
-SCREENSHOT = re.compile(r"mix-blend-mode\s*:(?!\s*normal)|\bmixBlendMode\s*:|backdrop-filter\s*:(?!\s*none)|\bdrop-shadow\("
-                        r"|(?<![\w-])(?:mask|maskImage|rotationX|rotationY|rotateX|rotateY|translateZ|z)\s*:")
+# Fails the other properties that check would have caught, plus the CSS effects that send the whole render to screenshot capture.
+SCREENSHOT = re.compile(r"mix-blend-mode\s*:(?!\s*normal)|\bmixBlendMode\s*:|backdrop-filter\s*:(?!\s*none)|\bbackdropFilter\s*:"
+                        r"|\bdrop-shadow\("
+                        r"|(?<![\w-])(?:maskImage|rotationX|rotationY|rotateX|rotateY|translateZ)\s*:")
 STATE_HEAD = "## Finish state"
 SYNC_LIMIT_S = 2.0
 
