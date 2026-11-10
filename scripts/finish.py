@@ -26,7 +26,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from adopt_voice import fill_facts, load_facts  # noqa: E402
+from adopt_voice import fill_facts, load_facts, progress_bar  # noqa: E402
 from build_index import layout, scene_ids  # noqa: E402
 
 # A CSS blur drops the renderer from fast capture to screenshot capture (about 2x slower). `f.blur(tl, ...)` is
@@ -51,9 +51,26 @@ STATE_HEAD = "## Finish state"
 SYNC_LIMIT_S = 2.0
 
 
-def run_command(cmd, cwd):
-    env = {**RENDER_ENV, **os.environ}
-    return subprocess.run(cmd, cwd=cwd, env=env).returncode
+def run_command(cmd, cwd, capture=False):
+    """Run a render. Prints a bar line each 5% and the other output; returns the exit code, or (code, output) if capture."""
+    # Text mode reads HyperFrames' redrawn "\r" bar as lines, and its per-frame @hf-progress JSON is thinned to 5% steps.
+    kept, step = [], -1
+    with subprocess.Popen(cmd, cwd=cwd, env={**RENDER_ENV, **os.environ}, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, text=True, bufsize=1) as proc:
+        for line in proc.stdout:
+            kept.append(line)
+            if line.startswith("@hf-progress "):
+                try:
+                    pct = int(json.loads(line[len("@hf-progress "):])["pct"])
+                except (ValueError, KeyError, TypeError):
+                    continue
+                if pct // 5 > step:
+                    step = pct // 5
+                    print(f"render  {progress_bar(pct, 100)}", flush=True)
+            elif "█" not in line and "░" not in line:
+                print(line, end="", flush=True)
+    code = proc.returncode
+    return (code, "".join(kept)) if capture else code
 
 
 def probe_length(video):
