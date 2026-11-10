@@ -151,6 +151,9 @@ class FinishTests(unittest.TestCase):
         self.assertIn("compositions/feed.html:3", err)
         self.assertNotIn("feed.html:1", err)
 
+    def test_render_env_keeps_wipes_on_fast_capture(self):
+        self.assertEqual(finish.RENDER_ENV, {"HF_DE_PARALLEL_ROUTER": "true", "HF_FAST_CAPTURE_INTERVAL_SS": "false"})
+
     def test_blur_lint_catches_css_filters_in_index_html(self):
         (self.p / "index.html").write_text("<style>.x { backdrop-filter: blur(var(--r)); }</style>")
         self.assertEqual(self.run_finish("--review")[0], 1)

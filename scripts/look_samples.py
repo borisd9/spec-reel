@@ -22,7 +22,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import build_index  # noqa: E402
-from finish import fast_capture_problems  # noqa: E402
+from finish import RENDER_ENV, fast_capture_problems  # noqa: E402
 
 LOOK_NAME = re.compile(r"^\d+-[\w-]+$")
 PROJECT_FILES = ("hyperframes.json", "meta.json", "package.json")
@@ -74,7 +74,7 @@ def build_sample(p, look):
 
 def render_command(cmd, cwd):
     """Run the render like finish.run_command but keep its output: returns (exit code, stdout and stderr together)."""
-    env = {"HF_DE_PARALLEL_ROUTER": "true", **os.environ}
+    env = {**RENDER_ENV, **os.environ}
     r = subprocess.run(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     print(r.stdout, end="")
     return r.returncode, r.stdout

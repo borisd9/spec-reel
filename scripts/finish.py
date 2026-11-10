@@ -39,14 +39,17 @@ CALLBACK = re.compile(r"\bonUpdate\s*:")
 RANDOM = re.compile(r"^(?!\s*//).*\bMath\.random\s*\(")
 # A WebGL context always makes the renderer fall back to screenshot capture, about 2x slower.
 WEBGL = re.compile(r"""getContext\(\s*["'](?:webgl2?|experimental-webgl)["']|\bthree(?:\.module)?(?:\.min)?\.js\b""")
+# The parallel drawElement router renders a 3-minute, 17-scene video in 45 s against 1 m 55 s for one worker, with the
+# same frames (PSNR 72 dB) and the same self-checks. HF_FAST_CAPTURE_INTERVAL_SS=false keeps clipPath wipes on fast
+# capture; without it HyperFrames screenshots their frames and holds the render to one worker (200 s against 63 s,
+# lowest frame 53.5 dB). The other properties that gate catches are failed by SCREENSHOT below.
+RENDER_ENV = {"HF_DE_PARALLEL_ROUTER": "true", "HF_FAST_CAPTURE_INTERVAL_SS": "false"}
 STATE_HEAD = "## Finish state"
 SYNC_LIMIT_S = 2.0
 
 
 def run_command(cmd, cwd):
-    # Measured on a 3-minute, 17-scene video: the parallel drawElement router renders it in 45 s against 1 m 55 s for
-    # one worker, with the same frames (PSNR 72 dB) and the same self-checks.
-    env = {"HF_DE_PARALLEL_ROUTER": "true", **os.environ}
+    env = {**RENDER_ENV, **os.environ}
     return subprocess.run(cmd, cwd=cwd, env=env).returncode
 
 
