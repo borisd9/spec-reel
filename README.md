@@ -21,6 +21,8 @@ How a run goes:
 9. Put the title on the first frame as the cover, and write a share caption.
 10. Report what was made.
 
+After you approve the script, the skill writes three looks made for the subject, renders the intro in each, opens the three clips, and you pick one. The pick styles every scene, so no two videos share a look. A look can use any Google Fonts family; the skill downloads it into the run folder.
+
 With `--yolo`, the skill makes every approval itself and lists those decisions in the report (see [First run](#first-run)).
 
 Every run has its own folder with a `RUN.md` that records the stage and each approval, so an interrupted run can be resumed.
@@ -69,7 +71,6 @@ cp config.example.json config.json
 | Field | Meaning |
 |---|---|
 | `output_root` | Where run folders go. Default `~/Movies/hyperframes`. |
-| `style_preset` | The look of the scenes. Default `blue-professional`, the one the bundled scene template implements; for another, restyle a copy of `assets/index.template.html` as `build/index.template.html` in the run. |
 | `voice_source` | `qwen` (Qwen3-TTS on your Mac, default) or `own` (your own engine). `clone` (your cloned voice) is opt-in: the skill offers it at the voice question and never sets it. |
 | `qwen_speaker` | `Aiden` (default) or `Ryan`, the two English voices. |
 | `qwen_instruct` | A style instruction for Qwen3-TTS. Empty means a calm, conversational narrator. |

@@ -95,7 +95,7 @@ New stage `look`, between `script` and `scenes`. The stage line in `RUN.md` beco
    - `compositions/intro.html`: Frame 1 built in this look, with the approved title (the same rules as every scene).
 3. **The three looks differ.** Each uses a different medium, a different display face and a ground from a different
    color family. None is one of the 13 presets in `<hyperframes dir>/assets/frame-presets/` or the old
-   `blue-professional` look. Each one differs in medium and display face from the `SPEC.md` of the last five runs under
+   `blue-professional` look. Each one differs in medium and display face from the `SPEC.md` of the last three runs under
    config `output_root` (newest first, runs without a `SPEC.md` skipped).
 4. **The samples.** When `audio_meta.json` exists, `scripts/look_samples.py .` builds a one-frame project per look and
    renders it: `looks/<n>-<slug>/sample/` holds an `index.html` from that look's template with only Frame 1, its voice
@@ -115,7 +115,7 @@ New stage `look`, between `script` and `scenes`. The stage line in `RUN.md` beco
 7. **Resume.** A changed `looks/<pick>/LOOK.md` re-opens gate 3, then rebuilds every scene. A changed
    `user_script.txt` re-opens gate 2 but keeps the picked look: the intro scene is rebuilt in it when line 1 changed,
    and no new samples are made. Gate 3 re-opens after that only when the user asks for another look.
-8. **Yolo.** Write the three looks, skip the samples, take the recommended one, record
+8. **Yolo.** Write the three looks, render only the recommended one's sample (the next look when it fails), take it, record
    `gate 3 (look): auto (yolo) <time> <look name> sha256 <hash>`, and name the other two in the report's
    **Decided without you** section, one line each.
 
@@ -170,18 +170,20 @@ one found, run `--review` again, then show the stills. At most two rounds. Name 
 - How `look_samples.py` gives `build_index.build` a one-frame project (copying files into `sample/`, or a small
   argument on `build`), as long as `build_index.py`'s current behavior and tests stay the same.
 - The wording of the new `SKILL.md` and `handoff.md` sections, in the style of the files around them.
-- How the last five runs' `SPEC.md` files are found and compared (the agent reads them; no script is required).
+- How the last three runs' `SPEC.md` files are found and compared (the agent reads them; no script is required).
 
 ## My calls (not yet confirmed by the user)
+
+Confirmed by the user on 2026-11-09, with changes: uniqueness counts the last 3 runs, yolo renders the recommended look's sample, and fonts can be any Google Fonts family fetched by `scripts/fetch_font.py`. The other calls stand.
 
 - Three looks, matching HyperFrames' three storylines.
 - The samples wait for the adopted voice. Voicing and writing the three looks run at the same time, so the wait is
   mostly the three short renders.
-- Yolo skips the sample renders.
-- Bundled font families only, so no `.woff2` files are added to a run. Any weight is allowed: the HyperFrames
-  compiler fetches missing weights from Google Fonts and caches them in `~/.cache/hyperframes/fonts`. Ceiling: 19
-  families; add downloaded `.woff2` files when looks start to repeat.
+- Yolo renders only the recommended look's sample, and tries the next look when it fails.
+- A look may use any Google Fonts family, in any weight. `scripts/fetch_font.py` downloads the family's Latin
+  `.woff2` files into the run's `assets/fonts/` and prints the `@font-face` rules for the look's template; bundled
+  families need no download. A failed fetch means a bundled family.
 - With the user's own engine and no `tts_command`, the samples wait until the user has dropped every line's audio.
 - `style_preset` is removed (see Files that change).
-- Uniqueness is checked against the last five runs.
+- Uniqueness is checked against the last three runs.
 - Shapes are checked only for frames in a row; a shape may come back later in the video.

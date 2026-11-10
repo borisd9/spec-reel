@@ -637,10 +637,12 @@ INTRO_STORYBOARD = """## Frame 1 — Intro
 - voiceover: "This is a short tour of the new upload flow."
 ## Frame 2 — Middle
 - scene_job: change
+- shape: before-after
 - before: "Uploads fail silently."
 - after: "Uploads show an error."
 ## Frame 3 — End
 - scene_job: next
+- shape: steps
 """
 
 
@@ -686,6 +688,35 @@ class CheckScriptTests(Base):
             code, err = self.check(script)
             self.assertEqual(code, 0 if ok else 1, err)
             self.assertEqual("at most 20 words" in err, not ok)
+
+    def test_line_longer_than_30_words(self):
+        long = " ".join(["word"] * 31) + "."
+        script = INTRO_SCRIPT.replace("Shipped the thing.", long)
+        code, err = self.check(script)
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2: 31 spoken words; a scene has at most 30", err)
+
+    def test_a_spaced_dash_is_not_a_word(self):
+        text = " ".join(["word"] * 15) + " — " + " ".join(["word"] * 15) + "."
+        code, err = self.check(INTRO_SCRIPT.replace("Shipped the thing.", text))
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("spoken words", err)
+
+    def test_line_of_exactly_30_words_passes(self):
+        script = INTRO_SCRIPT.replace("Shipped the thing.", " ".join(["word"] * 30) + ".")
+        self.assertEqual(self.check(script)[0], 0)
+
+    def test_line_counts_written_words(self):
+        # "P R" is the spoken form of "PR": unrespell counts it as one written word
+        text = "We merged P R 12 " + " ".join(["word"] * 26) + "."  # 30 written words
+        self.assertEqual(self.check(INTRO_SCRIPT.replace("Shipped the thing.", text))[0], 0)
+
+    def test_discussion_line_counts_all_turns(self):
+        turns = "".join(f"### Turn — {s}\n    " + " ".join(["word"] * 8) + ".\n" for s in "ABAB")  # 32 words
+        body = DISCUSSION.split("## Line 2")[0] + "## Line 2 — Retries (Frame 2)\n" + turns + "## Line 3 — End (Frame 3)\n    Next up is more.\n"
+        code, err = self.discussion(body)
+        self.assertEqual(code, 1)
+        self.assertIn("frame 2: 32 spoken words; a scene has at most 30", err)
 
     def test_risky_words_warn_without_failing(self):
         risky = INTRO_SCRIPT.replace("Shipped the thing.", "Shipped kb_sync on PR412.")
@@ -743,10 +774,35 @@ class CheckScriptTests(Base):
     def test_intro_and_demo_frames_need_no_scene_job(self):
         script = INTRO_SCRIPT.replace("Middle (Frame 2)", "Demo (Frame 2)")
         storyboard = INTRO_STORYBOARD.replace(
-            "## Frame 2 — Middle\n- scene_job: change\n- before: \"Uploads fail silently.\"\n- after: \"Uploads show an error.\"",
+            "## Frame 2 — Middle\n- scene_job: change\n- shape: before-after\n- before: \"Uploads fail silently.\"\n- after: \"Uploads show an error.\"",
             "## Frame 2 — Demo\n- asset_candidates: public/demo-01.mp4 — [video] the upload")
         code, err = self.with_demo(script, storyboard)
         self.assertEqual(code, 0, err)
+
+    def test_frame_without_shape_is_named(self):
+        code, err = self.check(INTRO_SCRIPT, INTRO_STORYBOARD.replace("- shape: steps\n", ""))
+        self.assertEqual(code, 1)
+        self.assertIn("frame 3: STORYBOARD.md has no shape", err)
+
+    def test_unknown_shape_counts_as_missing(self):
+        code, err = self.check(INTRO_SCRIPT, INTRO_STORYBOARD.replace("shape: steps", "shape: bullets"))
+        self.assertEqual(code, 1)
+        self.assertIn("frame 3: STORYBOARD.md has no shape", err)
+
+    def test_two_frames_in_a_row_with_one_shape(self):
+        code, err = self.check(INTRO_SCRIPT, INTRO_STORYBOARD.replace("shape: steps", "shape: before-after"))
+        self.assertEqual(code, 1)
+        self.assertIn("frame 3: same shape as frame 2 (before-after)", err)
+
+    def test_demo_frame_between_same_shapes_still_fails(self):
+        script = INTRO_SCRIPT + "## Line 4 — Last (Frame 4)\n    The end.\n"
+        script = script.replace("End (Frame 3)", "Demo (Frame 3)")
+        storyboard = (INTRO_STORYBOARD.replace("## Frame 3 — End\n- scene_job: next\n- shape: steps\n",
+                                               "## Frame 3 — Demo\n- asset_candidates: public/demo-01.mp4 — [video] x\n")
+                      + "## Frame 4 — Last\n- scene_job: next\n- shape: before-after\n")
+        code, err = self.with_demo(script, storyboard)
+        self.assertEqual(code, 1)
+        self.assertIn("frame 4: same shape as frame 2 (before-after)", err)
 
     def test_title_on_another_frame_does_not_count(self):
         moved = INTRO_STORYBOARD.replace('- on_screen_title: "The New Upload Flow"\n', "") \

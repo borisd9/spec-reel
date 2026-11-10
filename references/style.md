@@ -32,7 +32,7 @@ Each one has a short bad and good version.
 ## For the voice
 
 - Spoken text is plain English at CEFR level A2, for listeners whose first language is not English: common everyday words, plain sentences, no idioms, slang or phrasal verbs with a hidden meaning. A product name or a term from the sources stays as it is, and the first time it is said, one short phrase says what it is.
-- A sentence has at most 30 words. Long sentences hurt Qwen3-TTS pacing and are hard to follow by ear.
+- A line (one scene) has at most 30 spoken words. Long lines hurt Qwen3-TTS pacing and are hard to follow by ear.
 - Read each line aloud in your head. Rewrite a line that has a tongue-twister, a run of consonants or a string of numbers.
 - Spell out symbols and units the way a person says them ("about 40 percent", not "~40%").
 
@@ -40,7 +40,7 @@ Each one has a short bad and good version.
 
 Only in a discussion run (two voices, A and B). A topic line is one scene and holds several turns.
 
-- 2 to 6 turns per topic line, alternating A and B, each turn 1 to 3 sentences.
+- 2 or 3 turns per topic line, alternating A and B, the turns together at most 30 words. A topic that needs more becomes two lines, so two scenes.
 - A hosts: opens the topic, asks, sums up. B explains and gives the facts.
 - Both speakers say only points from the approved digest, in the same tenses. Banter adds no claim.
 - The intro is one A turn, or has no turn heading. Its 20-word limit applies to the joined text.

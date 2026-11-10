@@ -105,6 +105,17 @@ class FinishTests(unittest.TestCase):
         self.assertFalse(any("snapshot" in c for c in fake.cmds))
         self.assertEqual(finish.read_state(self.p), {})  # the next run looks at everything again
 
+    def test_fast_capture_problems_names_file_and_line(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "a.html").write_text("ok\nfilter: blur(4px)\n")
+            (root / "b.html").write_text("tl.to(x, { onUpdate: () => {} })\n")
+            problems = finish.fast_capture_problems([root / "a.html", root / "b.html", root / "gone.html"], root)
+            self.assertEqual(len(problems), 2)
+            self.assertIn("a.html:2", problems[0])
+            self.assertIn("b.html:1", problems[1])
+            self.assertEqual(finish.fast_capture_problems([root / "gone.html"], root), [])
+
     def test_blur_lint_fails_a_filter_and_allows_the_fade_helper(self):
         (self.p / "compositions/feed.html").write_text('f.blur(tl, "#a", 0.1);\ntl.to("#a", { filter: "blur(8px)" });')
         code, _, err, fake = self.run_finish("--review")

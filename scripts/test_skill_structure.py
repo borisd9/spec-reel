@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = [ROOT / "SKILL.md", ROOT / "README.md", *sorted((ROOT / "references").glob("*.md"))]
 # Files of the installed HyperFrames skill that these docs name on purpose (the dependency check in handoff.md).
-EXTERNAL = {"references/film.md", "references/format.md", "references/sound.md"}
+EXTERNAL = {"references/film.md", "references/format.md", "references/sound.md", "references/spec.md"}
 BANNED = ("faceless-explainer", "Skill tool", "run_in_background")
 # A path into one agent's HyperFrames copy; the search loop in handoff.md names folders without a trailing slash.
 AGENT_PATH = re.compile(r"\.\w+/skills/hyperframes/")
@@ -38,7 +38,7 @@ class SkillStructureTests(unittest.TestCase):
 
     def test_every_script_and_asset_is_documented_and_present(self):
         skill = (ROOT / "SKILL.md").read_text() + (ROOT / "references/handoff.md").read_text()
-        for rel in ("scripts/finish.py", "scripts/build_index.py", "assets/scene.template.html"):
+        for rel in ("scripts/finish.py", "scripts/build_index.py", "scripts/look_samples.py", "assets/scene.template.html"):
             self.assertTrue((ROOT / rel).is_file(), rel)
             self.assertIn(rel, skill, f"SKILL.md and handoff.md never mention {rel}")
         self.assertTrue((ROOT / "assets/index.template.html").is_file())
@@ -73,6 +73,34 @@ class SkillStructureTests(unittest.TestCase):
         keys = set(json.loads((ROOT / "config.example.json").read_text()))
         configure = re.search(r"^## Configure\n(.*?)(?=^## )", (ROOT / "README.md").read_text(), re.S | re.M).group(1)
         self.assertEqual(set(re.findall(r"^\| `(\w+)` \|", configure, re.M)), keys)
+
+    def test_look_gate_is_documented(self):
+        skill = (ROOT / "SKILL.md").read_text()
+        self.assertIn("sources | digest | script | look | scenes | done", skill)
+        self.assertIn("gate 3 (look)", skill)
+        self.assertIn("scripts/look_samples.py", skill + (ROOT / "references/handoff.md").read_text())
+        self.assertIn("gate 3", (ROOT / "references/yolo.md").read_text().lower())
+
+    def test_no_fixed_style_preset(self):
+        self.assertNotIn("style_preset", json.loads((ROOT / "config.example.json").read_text()))
+        for doc in DOCS:
+            self.assertNotIn("style_preset", doc.read_text(), doc.name)
+
+    def test_scene_template_is_a_bare_skeleton(self):
+        t = (ROOT / "assets/scene.template.html").read_text()
+        for gone in ("eyebrow", "f.blur(", "f.exit("):
+            self.assertNotIn(gone, t)
+        for kept in ("<template>", 'data-composition-id="SCENE_ID"', "window.__timelines[S] = tl"):
+            self.assertIn(kept, t)
+
+    def test_gate_3_decisions_2026_11_09(self):
+        skill = (ROOT / "SKILL.md").read_text()
+        self.assertIn("last three runs", skill)
+        self.assertNotIn("last five runs", skill)
+        self.assertIn("scripts/fetch_font.py", skill)
+        yolo = (ROOT / "references/yolo.md").read_text()
+        self.assertIn("--look", yolo)
+        self.assertNotIn("skip look_samples.py", yolo)
 
 
 if __name__ == "__main__":

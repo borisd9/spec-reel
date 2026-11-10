@@ -63,7 +63,7 @@
       html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--color-ground, #fdfae7); }
       #root { position: relative; width: 1920px; height: 1080px; background: var(--color-ground, #fdfae7); }
 
-      /* Shared scene vocabulary (blue-professional, scaled for video). Every scene uses these. */
+      /* Placeholder look (blue-professional). Every run restyles a copy of this file as its own look (`looks/<n>-<slug>/index.template.html`, then `build/index.template.html`); this look is never shipped as is. */
       .stage { position: absolute; inset: 0; font-family: var(--font-body), Inter, sans-serif; color: var(--color-ink, #111); }
       .eyebrow { position: absolute; left: 192px; top: 128px; font: 600 28px/1 var(--font-display), sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent, #1e2bfa); }
       .title { position: absolute; left: 192px; top: 178px; width: 1536px; font: 600 64px/1.1 var(--font-display), sans-serif; letter-spacing: -0.02em; color: var(--color-ink, #111); }
