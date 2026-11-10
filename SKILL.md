@@ -165,7 +165,7 @@ Set `stage: look`.
    python3 -I <this skill's directory>/scripts/look_samples.py .
    ```
 
-   The render prints `render  ███░░ 45%` every 5%: run it in the background, check it about every 30 seconds, and give the user the latest bar in one line each time, The script prints `rendering <look> (i/n)` before each look's bars, so name that look in your line (`Look 2/3 ██████░░ 60%`).
+   The render prints `render  ███░░ 45%` every 5%: run it in the background, check it about every 30 seconds, and give the user the latest bar in one line each time. The script prints `rendering <look> (i/n)` before each look's bars, so name that look in your line (`Look 2/3 ██████░░ 60%`).
 
    `--look <folder name>` redoes one look. The script fails before any render when a look has a filter, an `onUpdate` or a `Math.random()`, lacks a file, or cues a word the intro does not say; fix the look's own files and run it again. A look whose render fell back to screenshot capture is printed with "slower render".
 6. Open the three `looks/<n>-<slug>/intro.mp4` files for the user (`open` on macOS). For each, list its name, the line on why it fits, and its path. Put your recommendation first, with the reason in one clause: the style from the category's `looks` whose `fits` best matches the approved digest (name the category in the reason). Show "slower render" next to a look that has it.
