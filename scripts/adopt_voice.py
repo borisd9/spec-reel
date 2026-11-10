@@ -59,7 +59,7 @@ CATEGORY_JOBS = {
     "B": (("why", True, ()), ("picture", True, ()), ("mapping", True, ("picture", "real")), ("takeaway", True, ())),
     "C": (("progress", True, ("number",)), ("plans", True, ()), ("problems", False, ())),
 }
-CATEGORY_RE = re.compile(r"^\s*[-*]\s+category\s*:\s*(.*?)\s*$", re.I | re.M)
+CATEGORY_RE = re.compile(r"^[ \t]*[-*][ \t]+category[ \t]*:[ \t]*(.*?)[ \t]*$", re.I | re.M)
 SHAPES = ("number", "myth", "before-after", "converge", "network", "chosen", "steps", "screenshot", "quote", "chapter")
 # Respelled for the voice only (the written script and SCRIPT.md keep the written form). The config `pronunciations`
 # setting is merged over this by the caller.
@@ -68,10 +68,10 @@ CARD_RE = re.compile(r"^\s*[-*]\s+(scene_job|before|after|shape|picture|real|num
 
 
 def run_category(p):
-    """Run folder -> "A", "B" or "C" from RUN.md's `- category:` line; None when there is no RUN.md or no such line."""
+    """Run folder -> "A", "B" or "C" from RUN.md's `- category:` line; None when there is no RUN.md, no such line, or an empty value."""
     run_md = p / "RUN.md"
     m = CATEGORY_RE.search(run_md.read_text()) if run_md.exists() else None
-    if not m:
+    if not m or not m.group(1):
         return None
     if m.group(1).upper() not in CATEGORY_JOBS:
         raise ValueError("RUN.md: category must be A, B or C")

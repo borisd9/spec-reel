@@ -944,6 +944,14 @@ class CategoryCheckTests(Base):
         code, err = self.run_main("--check-script")
         self.assertEqual(code, 0, err)
 
+    def test_empty_category_line_is_legacy(self):
+        (self.p / "RUN.md").write_text("## Answers\n- category:\n- audience: team\n")
+        (self.p / "user_script.txt").write_text(INTRO_SCRIPT)
+        (self.p / "STORYBOARD.md").write_text(INTRO_STORYBOARD)
+        code, err = self.run_main("--check-script")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("RUN.md", err)
+
     def test_missing_run_md_is_legacy(self):
         code, err = self.check((INTRO_SCRIPT, INTRO_STORYBOARD), None)
         self.assertEqual(code, 0, err)
