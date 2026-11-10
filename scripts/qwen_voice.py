@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Voice SCRIPT.md lines on this Mac with Qwen3-TTS (through MLX-Audio) into voice-in/NN.wav.
 
-    uv run --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
-        python <skill dir>/scripts/qwen_voice.py <project_dir> [--frames 1 3 | --frames-with WORD] \
+    "<qwen venv>/bin/python" <skill dir>/scripts/qwen_voice.py <project_dir> [--frames 1 3 | --frames-with WORD] \
         [--speaker Aiden] [--voice A=Aiden --voice B=Ryan] [--say KBs=K-Bs ...] [--tempo 0.8] \
         [--clone-audio me.wav --clone-transcript me.txt]
     python3 -I <skill dir>/scripts/qwen_voice.py <project_dir> --restore <take> [--frames 1 3]

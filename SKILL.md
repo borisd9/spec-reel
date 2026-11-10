@@ -194,5 +194,6 @@ Stop and tell the user, without improvising, when:
 - a file the skill needs is missing under `<hyperframes dir>` (name it) or `npx hyperframes check --help` fails;
 - a step would need the `hyperframes` skill loaded as a skill;
 - a voice check fails and the user declines to switch voice source;
+- the voice environment does not build (the environment check in `references/handoff.md` § Qwen3-TTS failed or stalled for 10 minutes): stop and report; never change the package index without asking;
 - `look_samples.py` still fails after three fixes to the look's own files;
 - a `finish.py` step still fails after three fixes, or its cause is not in the run's own files (a scene, the script, the voice): say which step and show the error.

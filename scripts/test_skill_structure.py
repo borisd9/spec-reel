@@ -190,6 +190,18 @@ class SkillStructureTests(unittest.TestCase):
             self.assertIn("references/categories.md", (ROOT / f).read_text(), f)
         self.assertIn("instruct", (ROOT / "references/handoff.md").read_text())
 
+    def test_voice_env_check_is_documented(self):
+        handoff = (ROOT / "references/handoff.md").read_text()
+        self.assertIn("\"<qwen venv>/bin/python\" -c \"import importlib.metadata as m, mlx_audio; assert m.version('mlx-audio') == '0.6.1'\"", handoff)
+        self.assertIn("UV_HTTP_TIMEOUT=1800 UV_HTTP_RETRIES=5 uv pip install -v --python", handoff)
+        self.assertIn("qwen-venv", handoff)
+        voicing = [l.strip() for l in handoff.splitlines() if "scripts/qwen_voice.py" in l and not l.strip().endswith(".")]
+        self.assertTrue(voicing)
+        for cmd in voicing:
+            self.assertTrue(cmd.startswith('"<qwen venv>/bin/python" '), cmd)
+        for banned in ("--offline", "--index-url", "--default-index", "UV_INDEX_URL"):
+            self.assertNotIn(banned, handoff)
+
 
 if __name__ == "__main__":
     unittest.main()
