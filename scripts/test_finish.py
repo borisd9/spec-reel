@@ -189,15 +189,18 @@ class FinishTests(unittest.TestCase):
             'tl.fromTo(".b", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0 0 0)" }, 0);\n'
             ".c { mix-blend-mode: multiply; }\n"
             'tl.to(".d", { rotationX: 30 }, 0);\n'
-            'tl.to(".e", { mask: "none" }, 0);')
+            'tl.to(".e", { maskImage: "none" }, 0);\n'
+            "const shots = [{x: 960, y: 540, z: 1.4}]; .g { mask: radial-gradient(#000, transparent); }\n"
+            'tl.to(".h", { backdropFilter: "blur(8px)" }, 0);')
         code, _, err, _ = self.run_finish("--review")
         self.assertEqual(code, 1)
         self.assertIn("blend modes, backdrop filters, drop shadows and tweens of mask or 3D properties force "
                       "screenshot capture", err)
-        for n in (3, 4, 5):
+        for n in (3, 4, 5, 7):
             self.assertIn(f"feed.html:{n}", err)
         self.assertNotIn("feed.html:1", err)
         self.assertNotIn("feed.html:2", err)
+        self.assertNotIn("feed.html:6", err)
 
     def test_render_env_keeps_wipes_on_fast_capture(self):
         self.assertEqual(finish.RENDER_ENV, {"HF_DE_PARALLEL_ROUTER": "true", "HF_FAST_CAPTURE_INTERVAL_SS": "false"})
