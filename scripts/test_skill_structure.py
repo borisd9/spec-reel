@@ -195,7 +195,7 @@ class SkillStructureTests(unittest.TestCase):
         self.assertIn("\"<qwen venv>/bin/python\" -c \"import importlib.metadata as m, mlx_audio; assert m.version('mlx-audio') == '0.6.1'\"", handoff)
         self.assertIn("UV_HTTP_TIMEOUT=1800 UV_HTTP_RETRIES=5 uv pip install -v --python", handoff)
         self.assertIn("qwen-venv", handoff)
-        voicing = [l.strip() for l in handoff.splitlines() if "scripts/qwen_voice.py" in l and not l.strip().endswith(".")]
+        voicing = [line.strip() for line in handoff.splitlines() if "scripts/qwen_voice.py" in line and not line.strip().endswith(".")]
         self.assertTrue(voicing)
         for cmd in voicing:
             self.assertTrue(cmd.startswith('"<qwen venv>/bin/python" '), cmd)
