@@ -51,7 +51,11 @@ def main(argv, fetch=http_get):
     if len(argv) < 3:
         print(USAGE, file=sys.stderr)
         return 1
-    p, family, weights = Path(argv[0]), argv[1], argv[2:]
+    if not all(w.isdigit() for w in argv[2:]):
+        print(USAGE, file=sys.stderr)
+        return 1
+    p, family = Path(argv[0]), argv[1]
+    weights = sorted(set(argv[2:]), key=int)  # the css2 API wants weights ascending, without repeats
     if family in BUNDLED:
         print(f'"{family}" is bundled; no download needed')
         return 0
@@ -71,13 +75,11 @@ def main(argv, fetch=http_get):
                 data = fetch(urls[w], headers)
                 fonts.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(data)
-    except urllib.error.HTTPError as e:
-        if e.code != 400:
-            raise
-        print(f'Google Fonts has no family "{family}" at weights {" ".join(weights)}', file=sys.stderr)
-        return 1
-    except urllib.error.URLError as e:
-        print(f"could not reach Google Fonts ({e.reason}); use a bundled family instead", file=sys.stderr)
+    except OSError as e:
+        if isinstance(e, urllib.error.HTTPError) and e.code == 400:
+            print(f'Google Fonts has no family "{family}" at weights {" ".join(weights)}', file=sys.stderr)
+            return 1
+        print(f"could not reach Google Fonts ({getattr(e, 'reason', e)}); use a bundled family instead", file=sys.stderr)
         return 1
     for w in weights:
         print(f'@font-face {{ font-family: "{family}"; src: url("assets/fonts/{slug(family)}-{w}.woff2") '
