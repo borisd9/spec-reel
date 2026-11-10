@@ -46,7 +46,9 @@ RENDER_ENV = {"HF_DE_PARALLEL_ROUTER": "true", "HF_FAST_CAPTURE_INTERVAL_SS": "f
 # Fails the other properties that check would have caught, plus the CSS effects that send the whole render to screenshot capture.
 SCREENSHOT = re.compile(r"mix-blend-mode\s*:(?!\s*normal)|\bmixBlendMode\s*:|backdrop-filter\s*:(?!\s*none)|\bbackdropFilter\s*:"
                         r"|\bdrop-shadow\("
-                        r"|(?<![\w-])(?:maskImage|rotationX|rotationY|rotateX|rotateY|translateZ)\s*:")
+                        r"|(?<![\w-])(?:maskImage|rotationX|rotationY|rotateX|rotateY|translateZ)\s*:"
+                        # bare z and mask only inside a tween call: camera data and the CSS mask shorthand are not slow
+                        r"|\.(?:to|from|fromTo|set)\(.*(?<![\w-])(?:z|mask)\s*:")
 LINT_RULES = (
     (BLUR, "filter blur() turns fast capture off; use opacity and y instead"),
     (CALLBACK, "onUpdate callbacks are not seek-safe and make fast capture fall back; build the effect from tweens of "

@@ -198,12 +198,13 @@ class FinishTests(unittest.TestCase):
             'tl.to(".d", { rotationX: 30 }, 0);\n'
             'tl.to(".e", { maskImage: "none" }, 0);\n'
             "const shots = [{x: 960, y: 540, z: 1.4}]; .g { mask: radial-gradient(#000, transparent); }\n"
-            'tl.to(".h", { backdropFilter: "blur(8px)" }, 0);')
+            'tl.to(".h", { backdropFilter: "blur(8px)" }, 0);\n'
+            'tl.to(".i", { z: 100 }, 0); tl.fromTo(".j", { mask: "none" }, { mask: "x" }, 0);')
         code, _, err, _ = self.run_finish("--review")
         self.assertEqual(code, 1)
         self.assertIn("blend modes, backdrop filters, drop shadows and tweens of mask or 3D properties force "
                       "screenshot capture", err)
-        for n in (3, 4, 5, 7):
+        for n in (3, 4, 5, 7, 8):
             self.assertIn(f"feed.html:{n}", err)
         self.assertNotIn("feed.html:1", err)
         self.assertNotIn("feed.html:2", err)
