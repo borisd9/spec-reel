@@ -209,8 +209,10 @@ class FinishTests(unittest.TestCase):
         self.assertNotIn("feed.html:2", err)
         self.assertNotIn("feed.html:6", err)
 
-    def test_render_env_keeps_wipes_on_fast_capture(self):
-        self.assertEqual(finish.RENDER_ENV, {"HF_DE_PARALLEL_ROUTER": "true", "HF_FAST_CAPTURE_INTERVAL_SS": "false"})
+    def test_render_env_reaches_the_render(self):
+        check = ("import os, sys; sys.exit(0 if os.environ.get('HF_DE_PARALLEL_ROUTER') == 'true'"
+                 " and os.environ.get('HF_FAST_CAPTURE_INTERVAL_SS') == 'false' else 1)")
+        self.assertEqual(finish.run_command([sys.executable, "-c", check], self.p), 0)
 
     def test_blur_lint_catches_css_filters_in_index_html(self):
         (self.p / "index.html").write_text("<style>.x { backdrop-filter: blur(var(--r)); }</style>")
