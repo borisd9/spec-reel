@@ -35,6 +35,10 @@ BLUR = re.compile(r"(?<![\w.])blur\(\s*(?:\d|var\()")
 # A tween callback that changes the page does not run on a seek, so a frame captured by a direct jump differs from
 # the sequential one and fast capture's self-check fails (it then re-renders everything the slow way).
 CALLBACK = re.compile(r"\bonUpdate\s*:")
+# A seek re-runs nothing, so a value drawn at random differs between capture passes. A line that is only a comment is skipped.
+RANDOM = re.compile(r"^(?!\s*//).*\bMath\.random\s*\(")
+# A WebGL context always makes the renderer fall back to screenshot capture, about 2x slower.
+WEBGL = re.compile(r"""getContext\(\s*["'](?:webgl2?|experimental-webgl)["']|\bthree(?:\.module)?(?:\.min)?\.js\b""")
 STATE_HEAD = "## Finish state"
 SYNC_LIMIT_S = 2.0
 
@@ -103,9 +107,13 @@ def fast_capture_problems(files, root):
              for n, line in enumerate(f.read_text().splitlines(), 1)]
     blur = [where for where, line in lines if BLUR.search(line)]
     callbacks = [where for where, line in lines if CALLBACK.search(line)]
+    unseeded = [where for where, line in lines if RANDOM.search(line)]
+    webgl = [where for where, line in lines if WEBGL.search(line)]
     return (["filter blur() turns fast capture off; use opacity and y instead: " + ", ".join(blur)] if blur else []) \
         + (["onUpdate callbacks are not seek-safe and make fast capture fall back; build the effect from tweens of "
-            "elements (see fx.type): " + ", ".join(callbacks)] if callbacks else [])
+            "elements (see fx.type): " + ", ".join(callbacks)] if callbacks else []) \
+        + (["Math.random is not seek-safe; use fx.rand(seed): " + ", ".join(unseeded)] if unseeded else []) \
+        + (["WebGL forces screenshot capture (about 2x slower); draw with Canvas 2D or SVG: " + ", ".join(webgl)] if webgl else [])
 
 
 class Finish:

@@ -117,6 +117,12 @@ class BuildIndexTests(unittest.TestCase):
         self.assertEqual(self.build()[0], 0)
         self.assertTrue((self.p / "index.html").read_text().startswith("<body>mine 12.000"))
 
+    def test_template_has_seek_safe_helpers(self):
+        template = (bi.SKILL / "assets/index.template.html").read_text()
+        for needle in ("CustomEase.min.js", "rand(seed)", "stepped(d, fps = 12)", "Math.max(1, Math.round(d * fps))"):
+            self.assertIn(needle, template)
+        self.assertNotIn("Math.random(", template)
+
     def test_the_template_has_no_css_blur(self):
         template = (bi.SKILL / "assets/index.template.html").read_text()
         self.assertNotIn("filter:", template.split("<style>")[0])

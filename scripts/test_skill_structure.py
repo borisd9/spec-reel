@@ -11,7 +11,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = [ROOT / "SKILL.md", ROOT / "README.md", *sorted((ROOT / "references").glob("*.md"))]
 # Files of the installed HyperFrames skill that these docs name on purpose (the dependency check in handoff.md).
-EXTERNAL = {"references/film.md", "references/format.md", "references/sound.md", "references/spec.md"}
+EXTERNAL = {"references/film.md", "references/format.md", "references/runtimes.md", "references/sound.md",
+            "references/spec.md"}
+STYLE_KEYS = ["source", "group", "fits", "palette", "fonts", "runtime", "motion", "rules", "avoid", "prompt"]
+HF_SEEK = {"painterly", "pixel", "cel"}
+BANG = {"continuous-action", "cartoon-stage", "white-catalog", "cartoon-collage", "saas-ui-tour", "claim-how-result",
+        "grainy-gradient"}
+FILTERS = r"(?i)feGaussianBlur|feTurbulence|drop-shadow\(|filter:\s*url|onUpdate"
 BANNED = ("faceless-explainer", "Skill tool", "run_in_background")
 # A path into one agent's HyperFrames copy; the search loop in handoff.md names folders without a trailing slash.
 AGENT_PATH = re.compile(r"\.\w+/skills/hyperframes/")
@@ -101,6 +107,49 @@ class SkillStructureTests(unittest.TestCase):
         yolo = (ROOT / "references/yolo.md").read_text()
         self.assertIn("--look", yolo)
         self.assertNotIn("skip look_samples.py", yolo)
+
+    def test_motion_styles_catalog(self):
+        text = (ROOT / "references/motion-styles.md").read_text()
+        sections = dict(re.findall(r"^## ([a-z0-9-]+) — .+?\n(.*?)(?=^## |\Z)", text, re.S | re.M))
+        self.assertEqual(set(sections), {"swiss", "flat-vector", "morph", "line-draw", "dataviz", "isometric",
+                                         "dark-keynote", "screencast", "hud", "print", "papercut", *HF_SEEK, *BANG})
+        for sid, body in sections.items():
+            self.assertEqual(re.findall(r"^- (\w+):", body, re.M), STYLE_KEYS, sid)
+            self.assertRegex(re.search(r"^- source: (.+)$", body, re.M).group(1),
+                             r"awesomeclaude\.ai|github\.com/bangtutorial/bang-motion")
+            fonts = re.search(r"^- fonts: (.+)$", body, re.M).group(1)
+            display = re.match(r"display ([A-Za-z ]+?) \d", fonts).group(1)
+            self.assertNotIn(display, {"Inter", "Space Grotesk", "JetBrains Mono"}, sid)
+            self.assertRegex(re.search(r"^- palette: (.+)$", body, re.M).group(1), r"#[0-9a-f]{6}")
+            runtime = re.search(r"^- runtime: (.+)$", body, re.M).group(1)
+            self.assertIn(runtime, {"gsap", "hf-seek", "gsap + hf-seek"}, sid)
+            if sid in HF_SEEK:
+                self.assertEqual(runtime, "hf-seek", sid)
+            self.assertNotRegex(body, r"(?i)three\.js|webgl", sid)
+            if sid in BANG:
+                self.assertIn("bangtutorial/bang-motion", re.search(r"^- source: (.+)$", body, re.M).group(1), sid)
+                for key in ("rules", "prompt"):  # the motion bullet may name a filter it replaces
+                    self.assertNotRegex(re.search(rf"^- {key}: (.+)$", body, re.M).group(1), FILTERS, f"{sid} {key}")
+        self.assertIn("## Not used, and why", text)
+        self.assertIn("## Default avoid list", text)
+        self.assertIn("awesomeclaude.ai", text)
+
+    def test_third_party_notices(self):
+        notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text()
+        for needle in ("Copyright (c) 2026 Bang Tutorial", "Permission is hereby granted, free of charge",
+                       "bangtutorial/bang-motion", "awesomeclaude.ai"):
+            self.assertIn(needle, notices)
+        self.assertIn("THIRD_PARTY_NOTICES.md", (ROOT / "README.md").read_text())
+
+    def test_gate_3_uses_the_catalog(self):
+        skill = (ROOT / "SKILL.md").read_text()
+        self.assertIn("references/motion-styles.md", skill)
+        self.assertIn("STYLE:", skill)
+        self.assertIn("three different", (ROOT / "references/motion-styles.md").read_text())
+        self.assertIn("references/motion-styles.md", (ROOT / "references/yolo.md").read_text())
+        loop = re.search(r"^for f in (.+?); do$", (ROOT / "references/handoff.md").read_text(), re.M).group(1).split()
+        self.assertIn("references/runtimes.md", loop)
+        self.assertIn("references/types/3d.md", loop)
 
 
 if __name__ == "__main__":
