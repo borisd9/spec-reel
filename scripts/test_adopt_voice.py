@@ -851,5 +851,127 @@ class CheckScriptTests(Base):
         self.assertEqual(self.check(INTRO_SCRIPT)[0], 0)
 
 
+def fixture(frames):
+    """[(job, shape, extra card lines)] -> (user_script, STORYBOARD.md), frame 1 the intro, one script line per frame."""
+    script = INTRO_SCRIPT.split("## Line 2")[0]
+    board = INTRO_STORYBOARD.split("## Frame 2")[0]
+    for n, (job, shape, extra) in enumerate(frames, 2):
+        label = "Demo" if job == "demo" else job.title()
+        script += f"## Line {n} — {label} (Frame {n})\n    Each part acts on another part.\n"
+        card = ("- asset_candidates: public/demo-01.png — [image] the screen\n" if job == "demo"
+                else f"- scene_job: {job}\n- shape: {shape}\n" + "".join(f'- {e}\n' for e in extra))
+        board += f"## Frame {n} — {label}\n{card}"
+    return script, board
+
+
+CAT_A = fixture([("question", "myth", ()), ("mechanism", "steps", ()), ("mechanism", "network", ()),
+                 ("edge", "chosen", ()), ("remember", "number", ())])
+CAT_B = fixture([("why", "myth", ()), ("picture", "steps", ()),
+                 ("mapping", "chosen", ('picture: "the gate"', 'real: "the filter"')), ("takeaway", "number", ())])
+CAT_C = fixture([("progress", "number", ('number: "12 shipped"',)), ("plans", "steps", ()), ("problems", "chosen", ())])
+
+
+class CategoryCheckTests(Base):
+    def check(self, fixture_, category, replace=None):
+        script, board = fixture_
+        if replace:
+            board = board.replace(*replace)
+        (self.p / "user_script.txt").write_text(script)
+        (self.p / "SCRIPT.md").write_text(script)
+        (self.p / "STORYBOARD.md").write_text(board)
+        if category is not None:
+            (self.p / "RUN.md").write_text(f"## Answers\n- category: {category}\n")
+        return self.run_main("--check-script")
+
+    def fails(self, fixture_, category, message, replace=None):
+        code, err = self.check(fixture_, category, replace)
+        self.assertEqual(code, 1, err)
+        self.assertIn(message, err)
+
+    def test_category_a_passes(self):
+        code, err = self.check(CAT_A, "A")
+        self.assertEqual(code, 0, err)
+
+    def test_category_b_and_c_pass(self):
+        for fx, cat in ((CAT_B, "B"), (CAT_C, "C")):
+            code, err = self.check(fx, cat)
+            self.assertEqual(code, 0, err)
+
+    def test_category_a_missing_remember_fails(self):
+        self.fails(fixture([("question", "myth", ()), ("mechanism", "steps", ())]), "A", "category A: no remember frame")
+
+    def test_job_returning_after_a_later_job_fails(self):
+        fx = fixture([("question", "myth", ()), ("mechanism", "steps", ()), ("edge", "chosen", ()),
+                      ("mechanism", "network", ()), ("remember", "number", ())])
+        self.fails(fx, "A", "frame 5: scene_job mechanism comes after edge; "
+                            "category A's arc is question, mechanism, change, edge, remember")
+
+    def test_category_a_change_needs_before_after(self):
+        fx = fixture([("question", "myth", ()), ("change", "before-after", ('before: "x"',)), ("remember", "number", ())])
+        self.fails(fx, "A", "frame 3: scene_job change needs after")
+
+    def test_category_b_mapping_needs_picture_and_real(self):
+        self.fails(CAT_B, "B", "frame 4: scene_job mapping needs real", replace=('- real: "the filter"\n', ""))
+
+    def test_category_b_requires_a_mapping(self):
+        fx = fixture([("why", "myth", ()), ("picture", "steps", ()), ("takeaway", "number", ())])
+        self.fails(fx, "B", "category B: no mapping frame")
+
+    def test_category_c_progress_needs_number(self):
+        self.fails(CAT_C, "C", "frame 2: scene_job progress needs number", replace=('- number: "12 shipped"\n', ""))
+
+    def test_category_c_problems_optional(self):
+        code, err = self.check(fixture([("progress", "number", ('number: "12 shipped"',)), ("plans", "steps", ())]), "C")
+        self.assertEqual(code, 0, err)
+
+    def test_legacy_job_in_a_category_run_fails(self):
+        self.fails(CAT_A, "A", "frame 3: scene_job next is not a category A job "
+                               "(question, mechanism, change, edge, remember)", replace=("scene_job: mechanism", "scene_job: next"))
+
+    def test_a_frame_without_scene_job_fails_in_a_category_run(self):
+        self.fails(CAT_A, "A", "frame 3: STORYBOARD.md has no scene_job", replace=("- scene_job: mechanism\n", ""))
+
+    def test_no_category_keeps_legacy_rules(self):
+        (self.p / "user_script.txt").write_text(INTRO_SCRIPT)
+        (self.p / "STORYBOARD.md").write_text(INTRO_STORYBOARD)
+        code, err = self.run_main("--check-script")
+        self.assertEqual(code, 0, err)
+
+    def test_run_md_without_a_category_line_is_legacy(self):
+        (self.p / "RUN.md").write_text("## Answers\n- audience: team\n")
+        (self.p / "user_script.txt").write_text(INTRO_SCRIPT)
+        (self.p / "STORYBOARD.md").write_text(INTRO_STORYBOARD)
+        code, err = self.run_main("--check-script")
+        self.assertEqual(code, 0, err)
+
+    def test_empty_category_line_is_legacy(self):
+        (self.p / "RUN.md").write_text("## Answers\n- category:\n- audience: team\n")
+        (self.p / "user_script.txt").write_text(INTRO_SCRIPT)
+        (self.p / "STORYBOARD.md").write_text(INTRO_STORYBOARD)
+        code, err = self.run_main("--check-script")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("RUN.md", err)
+
+    def test_missing_run_md_is_legacy(self):
+        code, err = self.check((INTRO_SCRIPT, INTRO_STORYBOARD), None)
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("RUN.md", err)
+
+    def test_category_is_case_insensitive(self):
+        for value in ("c", " C ", " c  "):
+            code, err = self.check(CAT_C, value)
+            self.assertEqual(code, 0, err)
+
+    def test_unknown_category_fails(self):
+        self.fails(CAT_A, "D", "RUN.md: category must be A, B or C")
+
+    def test_demo_frame_is_skipped_by_the_arc_check(self):
+        fx = fixture([("question", "myth", ()), ("mechanism", "steps", ()), ("demo", None, ()), ("remember", "number", ())])
+        (self.p / "public").mkdir()
+        (self.p / "public/demo-01.png").write_bytes(b"x")
+        code, err = self.check(fx, "A")
+        self.assertEqual(code, 0, err)
+
+
 if __name__ == "__main__":
     unittest.main()

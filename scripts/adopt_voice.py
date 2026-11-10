@@ -51,11 +51,31 @@ VOICE_STEM = re.compile(r"(\d+)(?:\.(\d+))?")  # voice-in file stem: frame, then
 DEMO_HEADING = re.compile(r"^#{2,3}\s+line\s+\d+\s+\W+\s*demo\s*\(frame\s+\d+\)", re.I | re.M)
 ASSETS_RE = re.compile(r"^\s*[-*]\s+asset_candidates\s*:\s*(.+?)\s*$", re.I)
 SCENE_JOBS = ("why", "change", "proof", "next")
+# Per category, its jobs in arc order as (job, required, fields the card must carry). references/categories.md lists
+# the same jobs, and a structure test keeps the two equal.
+CATEGORY_JOBS = {
+    "A": (("question", True, ()), ("mechanism", True, ()), ("change", False, ("before", "after")),
+          ("edge", False, ()), ("remember", True, ())),
+    "B": (("why", True, ()), ("picture", True, ()), ("mapping", True, ("picture", "real")), ("takeaway", True, ())),
+    "C": (("progress", True, ("number",)), ("plans", True, ()), ("problems", False, ())),
+}
+CATEGORY_RE = re.compile(r"^[ \t]*[-*][ \t]+category[ \t]*:[ \t]*(.*?)[ \t]*$", re.I | re.M)
 SHAPES = ("number", "myth", "before-after", "converge", "network", "chosen", "steps", "screenshot", "quote", "chapter")
 # Respelled for the voice only (the written script and SCRIPT.md keep the written form). The config `pronunciations`
 # setting is merged over this by the caller.
 BUILTIN_RESPELLINGS = {"id": "I-D", "ids": "I-Ds", "PR": "P R", "v8": "V-eight"}
-CARD_RE = re.compile(r"^\s*[-*]\s+(scene_job|before|after|shape)\s*:\s*(.+?)\s*$", re.I)
+CARD_RE = re.compile(r"^\s*[-*]\s+(scene_job|before|after|shape|picture|real|number)\s*:\s*(.+?)\s*$", re.I)
+
+
+def run_category(p):
+    """Run folder -> "A", "B" or "C" from RUN.md's `- category:` line; None when there is no RUN.md, no such line, or an empty value."""
+    run_md = p / "RUN.md"
+    m = CATEGORY_RE.search(run_md.read_text()) if run_md.exists() else None
+    if not m or not m.group(1):
+        return None
+    if m.group(1).upper() not in CATEGORY_JOBS:
+        raise ValueError("RUN.md: category must be A, B or C")
+    return m.group(1).upper()
 
 
 def parse_script(md):
@@ -534,20 +554,48 @@ def check_script(p):
             problems.append("frame 1: STORYBOARD.md has no on_screen_title for the intro")
         problems += [f"{d}: no STORYBOARD.md frame names public/{d} in asset_candidates"
                      for d in demos if d not in named_assets(storyboard)]
+        bad_category = False  # the job checks would only echo the RUN.md error
+        try:
+            category = run_category(p)
+        except ValueError as e:
+            problems.append(str(e))
+            category, bad_category = None, True
+        arc = [j[0] for j in CATEGORY_JOBS[category]] if category else []
+        seen, last = set(), -1  # the jobs met so far, and the arc index of the latest
         prev = None  # (frame, shape) of the last checked frame
         for frame, card in sorted(scene_cards(storyboard).items()):
             if frame == 1 or card.get("demo"):  # the intro and the Demo frames have no scene_job or shape
                 continue
-            if card.get("scene_job") not in SCENE_JOBS:
+            job = card.get("scene_job")
+            if bad_category:
+                pass
+            elif not category:
+                if job not in SCENE_JOBS:
+                    problems.append(f"frame {frame}: STORYBOARD.md has no scene_job")
+                elif job == "change" and not (card.get("before") and card.get("after")):
+                    problems.append(f"frame {frame}: scene_job change needs before and after")
+            elif not job:
                 problems.append(f"frame {frame}: STORYBOARD.md has no scene_job")
-            elif card["scene_job"] == "change" and not (card.get("before") and card.get("after")):
-                problems.append(f"frame {frame}: scene_job change needs before and after")
+            elif job not in arc:
+                problems.append(f"frame {frame}: scene_job {job} is not a category {category} job ({', '.join(arc)})")
+            else:
+                i = arc.index(job)
+                if i < last:
+                    problems.append(f"frame {frame}: scene_job {job} comes after {arc[last]}; "
+                                    f"category {category}'s arc is {', '.join(arc)}")
+                problems += [f"frame {frame}: scene_job {job} needs {f}"
+                             for f in CATEGORY_JOBS[category][i][2] if not card.get(f)]
+                last = max(last, i)
+                seen.add(job)
             shape = card.get("shape")
             if shape not in SHAPES:
                 problems.append(f"frame {frame}: STORYBOARD.md has no shape")
             elif prev and prev[1] == shape:
                 problems.append(f"frame {frame}: same shape as frame {prev[0]} ({shape})")
             prev = (frame, shape)
+        if category:
+            problems += [f"category {category}: no {job} frame"
+                         for job, required, _ in CATEGORY_JOBS[category] if required and job not in seen]
     for frame, text in approved:  # warnings only: they never fail the check
         for tok, why in risky_tokens(text):
             print(f'warning: frame {frame}: "{tok}" is {why}', file=sys.stderr)

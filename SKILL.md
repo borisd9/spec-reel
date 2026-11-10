@@ -1,7 +1,7 @@
 ---
 name: spec-reel
 description: "Turn links to plans and specs into a short narrated explainer video. Asks for the sources, audience and length, reads them into an approved digest, picks a demo mock or recording when one exists, writes an approved timestamped script with a title intro, voices it locally with Qwen3-TTS (or the user's own TTS), as one narrator or as a two-voice discussion, then builds one synced scene per line with the HyperFrames explainer route and renders an MP4. Use for requests like 'make a video explaining this plan', 'turn these specs into a narrated update video', 'short video of what this feature changes', 'explainer video from these docs for the team'. For a single document with no review gates or own-voice option, the hyperframes skill alone is enough."
-argument-hint: "[--yolo] links or paths to plans and specs"
+argument-hint: "[--yolo] [--category A|B|C] links or paths to plans and specs"
 ---
 
 # Spec Reel
@@ -37,7 +37,7 @@ Every run has one folder holding all its artifacts, and a `RUN.md` that records 
 
 Run folders are never deleted.
 
-**Resume:** show the recorded run answers in one line and continue from the recorded stage. Reuse the recorded `hyperframes` path after checking that it still exists; when it does not, search again. Do not ask the run questions again, read the sources again, or regenerate approved work. Before continuing, compare each approved file's SHA-256 with the one in `RUN.md`. When one differs, tell the user which file changed and re-open its gate: a changed digest re-opens gate 1 and then gate 2; a changed `looks/<pick>/LOOK.md` re-opens gate 3 and then rebuilds every scene; a changed `user_script.txt` re-opens gate 2 and keeps the picked look (the intro scene is rebuilt in it when line 1 changed; no new samples). At stage `scenes`, read `references/handoff.md` and the explainer route again before acting.
+**Resume:** show the recorded run answers in one line and continue from the recorded stage. Reuse the recorded `hyperframes` path after checking that it still exists; when it does not, search again. Do not ask the run questions again, read the sources again, or regenerate approved work. Before continuing, compare each approved file's SHA-256 with the one in `RUN.md`. When one differs, tell the user which file changed and re-open its gate: a changed digest re-opens gate 1 and then gate 2; so does a `category:` under `## Answers` that differs from the one on the gate 1 approval line, or a request for another category, because the arc and the digest headings depend on it; a changed `looks/<pick>/LOOK.md` re-opens gate 3 and then rebuilds every scene; a changed `user_script.txt` re-opens gate 2 and keeps the picked look (the intro scene is rebuilt in it when line 1 changed; no new samples). At stage `scenes`, read `references/handoff.md` and the explainer route again before acting.
 
 **New run:** ask these in one batch (defaults in brackets):
 
@@ -72,6 +72,7 @@ stage: sources            # sources | digest | script | look | scenes | done
 - voice source: qwen (speaker) | clone | own | discussion   tempo: <qwen_tempo>   (own: whether a tts_command was used, never its text)
 - format: narration | discussion (A: Aiden|Ryan|clone|own, B: Aiden|Ryan|clone|own)   (a resume rebuilds the `--voice` flags from this)
 - pause: <slide_pause_s>s   captions: off | on
+- category: A | B | C   (absent in runs made before categories: the old jobs)
 - mode: interactive | yolo
 
 ## Sources
@@ -81,7 +82,7 @@ stage: sources            # sources | digest | script | look | scenes | done
 - public/demo-01.<ext>  <original link or path>  <length for a recording>   (or: skipped)
 
 ## Approvals
-- gate 1 (digest): <time>  sha256 <hash of capture/extracted/visible-text.txt>
+- gate 1 (digest): <time>  category <A|B|C>  sha256 <hash of capture/extracted/visible-text.txt>
 - gate 2 (script): <time>  sha256 <hash of user_script.txt>
 - gate 3 (look): <time>  <look name>  sha256 <hash of looks/<pick>/LOOK.md>
 
@@ -106,16 +107,14 @@ While reading, note demo candidates: images and recordings in the sources that s
 
 Set `stage: digest`.
 
-1. Write `capture/extracted/visible-text.txt`. Its first line is `Title: <video title>`: at most eight words, naming what the video covers, drawn from the sources and the run answers. Then one section per source: its title, then three headed parts, each a short list with one line per point and the point's source link.
-   - **Why it exists**
-   - **What it changes**
-   - **What comes next**
+1. Choose the category to suggest (`references/categories.md`). An invocation that names one (`--category`, or plain words such as "for onboarding" or "exec summary") is used and shown as chosen. Otherwise judge it by `references/categories.md` § Suggesting a category.
+2. Write `capture/extracted/visible-text.txt`. Its first line is `Title: <video title>`: at most eight words, naming what the video covers, drawn from the sources and the run answers. Then one section per source: its title, then three headed parts, each a short list with one line per point and the point's source link. The headings, which parts carry tagged points and the line forms come from the category (`references/categories.md` § digest). The legacy layout, for a run with no category, is **Why it exists**, **What it changes**, **What comes next**.
 
-   Each "What it changes" point is one line, "You can now ..." or "... no longer ...", followed by a status tag taken from the source's own wording: `[shipped]`, `[in progress]` or `[planned]`. For a `[planned]` point the line reads "You will be able to ..." or "... will no longer ...". A fact the video needs that no source states becomes `[NEED: <what is missing>]`; never guess it.
-2. Rewrite any point that names a customer or a person, or carries personal data, a secret or a credential, as a plain outcome. None of that goes into the digest.
-3. Write `capture/extracted/tokens.json`: `{ "title": "<the digest's Title>", "description": "<from the run answers>", "colors": [], "fonts": [] }`.
-4. Show the digest, title first, and with it ask the demo question from `references/demo.md`: use a candidate found in the sources, give a mock or recording, or skip. A run without a demo is normal. Ask for each `[NEED: ...]` point in the same message.
-5. Wait for approval or edits and a demo answer; loop until approved. The approved title is the one shown on the intro scene. Record the approval time and SHA-256 in `RUN.md`. Prepare the chosen demo files into `public/` and record them, or `skipped`, under `## Demo` in `RUN.md`.
+   A tagged point carries a status tag taken from the source's own wording: `[shipped]`, `[in progress]` or `[planned]`. In the legacy layout, and in A and B, a tagged point is one line, "You can now ..." or "... no longer ...", and for a `[planned]` point it reads "You will be able to ..." or "... will no longer ..."; C's forms are in its section. A fact the video needs that no source states becomes `[NEED: <what is missing>]`; never guess it.
+3. Rewrite any point that names a customer or a person, or carries personal data, a secret or a credential, as a plain outcome. None of that goes into the digest.
+4. Write `capture/extracted/tokens.json`: `{ "title": "<the digest's Title>", "description": "<from the run answers>", "colors": [], "fonts": [] }`.
+5. Show first the category (the suggestion with its one-clause reason, or the named one as chosen), then the three intents (A: how a system or change works; B: a new idea, for newcomers; C: where the numbers stand), then the digest, title first. Keeping the suggestion costs the user nothing extra. A different pick re-heads the digest under that category's headings and shows it again. With it ask the demo question from `references/demo.md`: use a candidate found in the sources, give a mock or recording, or skip. A run without a demo is normal. Ask for each `[NEED: ...]` point in the same message.
+6. Wait for approval or edits and a demo answer; loop until approved. The approved title is the one shown on the intro scene. Record the approval time, the category and the SHA-256 on the gate 1 line of `RUN.md`, and the category under `## Answers`. Prepare the chosen demo files into `public/` and record them, or `skipped`, under `## Demo` in `RUN.md`.
 
 ## Script (gate 2)
 
@@ -124,10 +123,11 @@ Set `stage: script`.
 Write `user_script.txt` at the run folder root. It is the only script file you edit: `SCRIPT.md` is generated from it. Write numbers, names and acronyms in their written form ("PR 12", "v8", "ids"): the voice respells them (`references/handoff.md` § Pronunciation). A fact that repeats across the video goes in `facts.json` and is written `{{key}}` (§ Facts). The format:
 
 - header line `**Voice:**` naming "Qwen3-TTS · <config qwen_speaker>", "Qwen3-TTS · cloned voice", or "your own engine" for the own source; in a discussion, `**Voices:** A — <voice>; B — <voice>` instead, each voice named the same way;
+- the arc, the line rule and the `**Delivery:**` default come from the run's category (`references/categories.md`); a legacy run (no `category:`) follows `Intro → Why → Change → Proof → Next`;
 - one section per spoken line: `## Line N — <label> (Frame N)`, then `**Time:**`, then `**Delivery:**`, then the spoken text indented four spaces; in a discussion line `**Time:**` and `**Delivery:**` come right after the line heading, before the first turn;
 - the first line is always the intro, `## Line 1 — Intro (Frame 1)`: one short sentence (at most 20 words) saying what this video is about, for example "This is a quick tour of the new upload flow and what it means for your team." Its scene shows the approved title. The user may reword the intro but not remove it;
 - every other line has at most 30 spoken words; in a discussion its turns count together;
-- with a demo, one `## Line N — Demo (Frame N)` line per demo file, in the "what it changes" part, describing what the viewer sees on it (`references/demo.md`); in a discussion it has no turn heading and A speaks it; without a demo, no Demo line;
+- with a demo, one `## Line N — Demo (Frame N)` line per demo file, beside the category's demo job (`references/categories.md` § demo; "what it changes" in a legacy run), describing what the viewer sees on it (`references/demo.md`); in a discussion it has no turn heading and A speaks it; without a demo, no Demo line;
 - Line N and Frame N carry the same number, counting up one per line from 1;
 - total length within the target length: the words at about 150 words per minute, plus `slide_pause_s` after every line but the last (in a discussion, also `TURN_GAP_S` (`scripts/adopt_voice.py`, 0.3 s) between the turns of a line);
 - spoken text is plain English at CEFR level A2 (`references/style.md` § For the voice);
@@ -135,7 +135,7 @@ Write `user_script.txt` at the run folder root. It is the only script file you e
 - a point tagged `[in progress]` or `[planned]` is spoken in the future tense ("will", "is being built"), never as done; only `[shipped]` points are spoken in the past or present tense;
 - in a discussion, a line is a topic and stays one scene. Under its heading come the turns, each a `### Turn — A` or `### Turn — B` heading and then the turn's text indented four spaces. A line with no turn heading is one turn spoken by A, so the intro needs none. Turn style rules (count, alternation, who hosts) are in `references/style.md` § Discussion lines.
 
-Before showing the script, check it against `references/style.md` and fix what fails, then run `adopt_voice.py . --check-script` (`references/handoff.md` § Script check) and fix what it reports. A concept a `next` line names gets one sentence on what it will do.
+Before showing the script, check it against `references/style.md` and fix what fails, then run `adopt_voice.py . --check-script` (`references/handoff.md` § Script check) and fix what it reports. A concept the last-job line (`remember`, `takeaway` or `plans`; `next` in a legacy run) names gets one sentence on what it will do.
 
 Show the title, the script, its word count and estimated length, and one line on where the text goes:
 
@@ -149,7 +149,7 @@ Wait for approval or edits; loop until approved. Record the approval time and SH
 Set `stage: look`.
 
 1. Right after gate 2, start Qwen3-TTS voicing and `adopt_voice.py` **in the background** (`references/handoff.md` § The order).
-2. While they run, pick three styles from `references/motion-styles.md` (§ Picking three) and write one look for each into `looks/1-<slug>/`, `looks/2-<slug>/` and `looks/3-<slug>/` in the run folder (`<slug>` is the look's name in kebab case). Each folder holds:
+2. While they run, pick three styles from `references/motion-styles.md` (§ Picking three; the recommended one comes from the category's `looks` in `references/categories.md`) and write one look for each into `looks/1-<slug>/`, `looks/2-<slug>/` and `looks/3-<slug>/` in the run folder (`<slug>` is the look's name in kebab case). Each folder holds:
    - `LOOK.md`: the look's name, `STYLE: <id>` (the catalog style it starts from), one line on why it fits this subject, and three lines in numbers, not adjectives, as `<hyperframes dir>/references/spec.md` describes them. `LOOK:` is the ground (hex, texture and how much), the ink, one accent and where it may appear, the display face with weight, size in px and tracking, the body face the same, the medium, light and depth. `MOTION:` is the eases by role (enter, move, exit), the durations, and how this medium moves (paper is cut and lifted, ink is printed). `LOOK:` and `MOTION:` take the style's palette, fonts and numbers unchanged; the look may change only the accent's hue, to fit a brand a source brings. `BANNED:` is the style's `avoid` line, plus `references/motion-styles.md` § Default avoid list, plus the defaults in `spec.md` § BANNED by default;
    - `index.template.html`: a copy of `assets/index.template.html`, restyled. The root variables, the `@font-face` rules and the shared classes change. The placeholders and `fx.at`, `fx.fact` and `fx.type` stay as they are. Add the moves the `MOTION` line names to `fx`, under new names, each a `fromTo` tween. The old fade moves (`blur`, `rise`, `slide`, `pop`, `fade`, `exit`) stay so older scenes still work; new scenes use the look's moves. No CSS filters, no `onUpdate`, no `Math.random()`: a style's randomness comes from `fx.rand(seed)`, its 12 fps steps from `fx.stepped(d)`, its cubic-bezier eases from `CustomEase` (see `references/motion-styles.md`);
    - `compositions/intro.html`: Frame 1 built in this look, with the approved title.
@@ -166,7 +166,7 @@ Set `stage: look`.
    ```
 
    `--look <folder name>` redoes one look. The script fails before any render when a look has a filter, an `onUpdate` or a `Math.random()`, lacks a file, or cues a word the intro does not say; fix the look's own files and run it again. A look whose render fell back to screenshot capture is printed with "slower render".
-6. Open the three `looks/<n>-<slug>/intro.mp4` files for the user (`open` on macOS). For each, list its name, the line on why it fits, and its path. Put your recommendation first, with the reason in one clause: the style whose `fits` best matches the approved digest. Show "slower render" next to a look that has it.
+6. Open the three `looks/<n>-<slug>/intro.mp4` files for the user (`open` on macOS). For each, list its name, the line on why it fits, and its path. Put your recommendation first, with the reason in one clause: the style from the category's `looks` whose `fits` best matches the approved digest (name the category in the reason). Show "slower render" next to a look that has it.
 7. The user picks a look, asks for changes to one (rebuild that look and its sample only), or asks for three new ones. On the pick:
    - copy `looks/<pick>/index.template.html` to `build/index.template.html` and `looks/<pick>/compositions/intro.html` to `compositions/intro.html`;
    - write `SPEC.md` at the run folder root: the picked `LOOK.md` lines (including `STYLE:`, which the last-three-runs rule reads), plus `GOAL`, `OUTPUT` (1920 x 1080, 30 fps) and `TIME` from the run answers. `SHOTS` and `QA` are added once `STORYBOARD.md` exists. `SPEC.md` is a working file and is not hashed;
@@ -179,7 +179,7 @@ In yolo mode: `references/yolo.md`.
 Set `stage: scenes`. Everything from here is in `references/handoff.md`; read it now. In short:
 
 1. Voicing and `adopt_voice.py` were started in the background after gate 2. Write `STORYBOARD.md` while they run, and the scenes once the look is picked. Cues need `audio_meta.json` only at build time.
-2. `STORYBOARD.md`: one frame per script line, Frame 1 the intro with the approved title as `on_screen_title`, every other frame a `scene_job` and a `shape`, each frame's scene id as `src: compositions/<id>.html`. In interactive mode the user reviews the frame plan before the scenes are built; in yolo mode (`mode: autonomous`) there is no review.
+2. `STORYBOARD.md`: one frame per script line, Frame 1 the intro with the approved title as `on_screen_title`, every other frame a `scene_job` and a `shape` (the category's jobs and fields: `references/categories.md` § jobs), each frame's scene id as `src: compositions/<id>.html`. In interactive mode the user reviews the frame plan before the scenes are built; in yolo mode (`mode: autonomous`) there is no review.
 3. Build one scene per frame from `assets/scene.template.html`, in the picked look and from the frame's `shape` (`build/index.template.html` and `SPEC.md`; the explainer route: one concrete example, a diagram that grows, the voice as the clock). Cue reveals on word text, `at("feed")`. No CSS filters. Music is `none`; captions follow the config `captions`.
 4. Before the review, the claim check: every name, number, date, status or capability shown on screen must come from the approved digest or the sources, and its tense must match the point's status tag; ungrounded lines are reworded in the digest's terms.
 5. **Preview.** `scripts/finish.py . --review` voice-checks, builds, and looks at the scenes that changed: a layout and contrast check plus a still of each. Show the stills; do not render yet. A change request rebuilds the named scenes (plus any whose length changes), runs `--review` again and shows their stills. The one full render, `scripts/finish.py . --final`, runs after the user approves, or once at the end in yolo mode. A change that brings a new source follows `references/handoff.md` § Change requests.

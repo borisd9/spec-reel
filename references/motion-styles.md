@@ -289,8 +289,9 @@ Particle bursts, lens flares, neon glow, RGB split, glitch, bouncy easing on eve
 
 Gate 3 picks three styles from this page by these rules, in this order.
 
+0. **Category.** The recommended style comes from the `looks` list of the run's category (`references/categories.md`). The other two come from that list where rules 1 and 2 allow, else from any style.
 1. **Three groups.** The three styles come from three different `group` values (`graphic`, `explain`, `drawn`, `retro`, `dimensional`).
 2. **Recent styles.** A style named in the `STYLE:` line of any of the last three runs' `SPEC.md` is not picked. When that leaves fewer than three groups, drop exclusions oldest first until three groups are available. The gate never fails for this.
-3. **Recommendation.** The recommended look is the style whose `fits` best matches the approved digest. It goes first, with a one-clause reason.
+3. **Recommendation.** The recommended look is the style whose `fits` best matches the approved digest, among the category's `looks` (rule 0). Its one-clause reason names the category. It goes first, with a one-clause reason.
 
 Worked example of rule 2. Take a catalog trimmed to four styles: `swiss` and `morph` (graphic), `dataviz` (explain), `print` (drawn). The last three runs used, newest first, `dataviz`, `print`, `swiss`. That excludes all of explain and drawn and one of graphic, leaving `morph`: one group. Drop the oldest exclusion, `swiss`: still only graphic. Drop the next oldest, `print`: graphic and drawn, two groups. Drop `dataviz`: three groups, so the pick is `swiss` or `morph`, `dataviz` and `print`. With the 21 styles above this cannot happen yet: taking away three groups needs at least 7 excluded styles, and three runs name at most 3. The rule stays for a smaller catalog.

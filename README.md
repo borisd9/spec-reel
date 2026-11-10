@@ -23,6 +23,8 @@ How a run goes:
 
 After you approve the script, the skill writes three looks made for the subject, renders the intro in each, opens the three clips, and you pick one. The pick styles every scene, so no two videos share a look. A look can use any Google Fonts family; the skill downloads it into the run folder.
 
+At the digest, the skill suggests a video category and you can pick another: **A**, a concept map (how a system or change works); **B**, an analogous storyboard (a new idea, for newcomers); or **C**, an analytical report (where the numbers stand). The category sets the script's arc, the digest's headings, the narrator's tone and the looks the skill prefers (`references/categories.md`).
+
 With `--yolo`, the skill makes every approval itself and lists those decisions in the report (see [First run](#first-run)).
 
 Every run has its own folder with a `RUN.md` that records the stage and each approval, so an interrupted run can be resumed.
@@ -162,6 +164,8 @@ Every pull request runs `.github/workflows/checks.yml`: these tests on Linux and
 The cover frame, the share caption and the on-screen claim check are adapted from [brag](https://github.com/latent-spaces/brag) by Shunit Haviv Hakimi (MIT).
 
 Styles adapted from Awesome Claude (https://awesomeclaude.ai/claude-motion-graphics, github.com/webfuse-com/awesome-claude, CC0-1.0; site footer says MIT) and from [bang-motion](https://github.com/bangtutorial/bang-motion) (MIT, © 2026 Bang Tutorial). Full notices, including the MIT text: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Video categories adapted from [visual-explainer](https://github.com/nicobailon/visual-explainer) by Nico Bailon (MIT), [mattpocock/skills](https://github.com/mattpocock/skills) `teach` by Matt Pocock (MIT) and [anthropics/skills](https://github.com/anthropics/skills/tree/main/skills/internal-comms) `internal-comms` by Anthropic, PBC (Apache-2.0). Notices and license texts: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Change-line, style and scene-card rules adapted from [marketingskills](https://github.com/coreyhaines31/marketingskills) (MIT, Corey Haines) and [story-skills](https://github.com/danjdewhurst/story-skills) (MIT).
 
