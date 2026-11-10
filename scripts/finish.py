@@ -57,9 +57,10 @@ def run_command(cmd, cwd, capture=False):
     # Text mode reads HyperFrames' redrawn "\r" bar as lines, and its per-frame @hf-progress JSON is thinned to 5% steps.
     kept, step = [], -1
     with subprocess.Popen(cmd, cwd=cwd, env={**RENDER_ENV, **os.environ}, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT, text=True, bufsize=1) as proc:
+                          stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1) as proc:
         for line in proc.stdout:
-            kept.append(line)
+            if capture:
+                kept.append(line)
             if line.startswith("@hf-progress "):
                 try:
                     pct = int(json.loads(line[len("@hf-progress "):])["pct"])

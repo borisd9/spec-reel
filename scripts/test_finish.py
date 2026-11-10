@@ -70,6 +70,13 @@ class RunCommandTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(finish.run_command([sys.executable, "-c", "import sys; sys.exit(3)"], self._td.name), 3)
 
+    def test_run_command_survives_a_non_utf8_byte(self):
+        cmd = [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'bad \\xff byte\\n')"]
+        with contextlib.redirect_stdout(io.StringIO()):
+            code, output = finish.run_command(cmd, self._td.name, capture=True)
+        self.assertEqual(code, 0)
+        self.assertIn("bad \ufffd byte", output)
+
 
 class FinishTests(unittest.TestCase):
     def setUp(self):

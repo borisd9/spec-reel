@@ -103,8 +103,9 @@ def main(argv, runner=None, render=None):
             except ValueError as e:
                 problems.append(f"{look.name}: {e}")
     if not problems:
-        for look, sample in samples:
+        for i, (look, sample) in enumerate(samples, 1):
             out = look / "intro.mp4"
+            print(f"rendering {look.name} ({i}/{len(samples)})", flush=True)
             code, log = render(["npx", "hyperframes", "render", ".", "-o", str(out)], sample)
             if code != 0:
                 problems.append(f"{look.name}: render failed")
