@@ -36,7 +36,7 @@ Every run has its own folder with a `RUN.md` that records the stage and each app
 - Node.js with `npx`
 - Python 3.10 or later
 - `ffmpeg` and `ffprobe` on your path
-- For the default voice: an Apple Silicon Mac and [`uv`](https://docs.astral.sh/uv/). The skill runs Qwen3-TTS with `uv run --with mlx-audio`, so there is nothing else to install; the model (about 4 GB) downloads on first use. On other machines, use your own engine.
+- For the default voice: an Apple Silicon Mac and [`uv`](https://docs.astral.sh/uv/). The skill builds one virtual environment for Qwen3-TTS with `uv` the first time, so there is nothing else to install; the model (about 4 GB) downloads on first use. On other machines, use your own engine.
 - Optional: the GitHub CLI (`gh`), signed in, to read GitHub links
 
 ## Install
@@ -86,18 +86,16 @@ cp config.example.json config.json
 
 ## Voice sources
 
-**Qwen3-TTS** (default). Runs locally through MLX-Audio, so the script text never leaves your machine. Model: `mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16` (Apache-2.0). On an Apple Silicon Mac it generates speech faster than real time: about a minute for 90 seconds of narration, after the first model load. To voice a script by hand:
+**Qwen3-TTS** (default). Runs locally through MLX-Audio, so the script text never leaves your machine. Model: `mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16` (Apache-2.0). On an Apple Silicon Mac it generates speech faster than real time: about a minute for 90 seconds of narration, after the first model load. It runs from one environment at `<qwen venv>` = `${XDG_CACHE_HOME:-$HOME/.cache}/spec-reel/qwen-venv`, built once and then run directly, so a slow package index only matters the first time. The check and the one-time build are in `references/handoff.md` § Qwen3-TTS. Then, to voice a script by hand:
 
 ```bash
-uv run --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
-  python scripts/qwen_voice.py <run folder> --speaker Aiden
+"<qwen venv>/bin/python" scripts/qwen_voice.py <run folder> --speaker Aiden
 ```
 
 **Your cloned voice (optional).** Pick it at the voice question of a run; it is never the default. Record 10 to 20 seconds of clear speech as a WAV file and write exactly what you say into a text file. The skill asks for both paths the first time and remembers them in `config.json`. Use only your own voice, or the voice of someone who agreed to it being cloned. It is still Qwen3-TTS on your Mac, with the Base model (`mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16`, downloads once, about 4 GB). Cloned speech often comes out faster than the speaker talks: set `qwen_tempo` to about `0.8` if it sounds rushed. By hand:
 
 ```bash
-uv run --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
-  python scripts/qwen_voice.py <run folder> --clone-audio me.wav --clone-transcript me.txt --tempo 0.8
+"<qwen venv>/bin/python" scripts/qwen_voice.py <run folder> --clone-audio me.wav --clone-transcript me.txt --tempo 0.8
 ```
 
 **Your own engine.** The skill lists every script line with its frame number and a target file name, `voice-in/NN.<ext>`. Either drop one audio file per line (WAV, MP3, M4A or AIFF), or give a command and the skill runs it once per line. In a command, `{text_file}` is a temp file holding the line's text and `{out}` is `voice-in/NN` with no extension; the command supplies its own extension:
@@ -117,8 +115,7 @@ By default one narrator reads every line. In a discussion, two speakers, A and B
 In the script, a topic line holds `### Turn — A` and `### Turn — B` sections, and the header names the voices with `**Voices:** A — <voice>; B — <voice>`. Each turn is voiced into its own file, `voice-in/NN.K.wav`, and `adopt_voice.py` joins a line's turns into one WAV with a short silence between them, so the rest of the build is the same. By hand:
 
 ```bash
-uv run --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
-  python scripts/qwen_voice.py <run folder> --voice A=Aiden --voice B=Ryan
+"<qwen venv>/bin/python" scripts/qwen_voice.py <run folder> --voice A=Aiden --voice B=Ryan
 ```
 
 A voice is a built-in speaker name or `clone`. With `--yolo`, a discussion happens only when you ask for one; A is your `qwen_speaker` and B is the other English voice.

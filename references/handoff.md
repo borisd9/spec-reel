@@ -132,12 +132,28 @@ Both voice sources end the same way: one audio file per script line in `voice-in
 
 ### Qwen3-TTS (default)
 
-Runs on this Mac (Apple Silicon) with Qwen3-TTS through MLX-Audio. The script text does not leave the machine. From the project folder:
+Runs on this Mac (Apple Silicon) with Qwen3-TTS through MLX-Audio. The script text does not leave the machine. It runs from one persistent virtual environment, `<qwen venv>` = `${XDG_CACHE_HOME:-$HOME/.cache}/spec-reel/qwen-venv` (never inside the skill folder or a run folder), built once and then run directly: no uv resolver and no package index on later runs. Two steps, both from the project folder.
 
-```bash
-uv run -q --python 3.11 --with mlx-audio==0.6.1 --with soundfile \
-  python <this skill's directory>/scripts/qwen_voice.py . --speaker <config qwen_speaker>
-```
+1. **Environment check (no network, under a second).**
+
+   ```bash
+   "<qwen venv>/bin/python" -c "import importlib.metadata as m, mlx_audio, mlx_audio.tts.utils, soundfile; assert m.version('mlx-audio') == '0.6.1'"
+   ```
+
+   Exit 0: voice (step 2). Any failure means the venv is missing, pins another `mlx-audio`, or was left half-built (the check imports what `qwen_voice.py` imports, so that case rebuilds too). Build it in the background, with `voice-env.log` in the project folder. The subshell gives `uv venv` (which may download Python 3.11) the same timeouts and log, and `--clear` replaces an existing venv:
+
+   ```bash
+   ( export UV_HTTP_TIMEOUT=1800 UV_HTTP_RETRIES=5
+     uv venv --clear --python 3.11 "<qwen venv>" && \
+     uv pip install -v --python "<qwen venv>/bin/python" mlx-audio==0.6.1 soundfile ) > voice-env.log 2>&1
+   ```
+
+   With `-v` the log gains a line per request, so a log that has not grown for 10 minutes is a stall, and its last lines name the request. Look at it every minute or two. On exit 0, run the check again, then voice. When it fails or stalls, stop and tell the user: "The voice environment did not build: the package index is slow or unreachable (see voice-env.log)." Then offer: wait and retry the same command, or the user's own engine (switch per the voice check below). Do not change the package index.
+2. **Voice.** The model download below goes to Hugging Face, not through uv.
+
+   ```bash
+   "<qwen venv>/bin/python" <this skill's directory>/scripts/qwen_voice.py . --speaker <config qwen_speaker>
+   ```
 
 When the run's voice source is `clone`, add `--clone-audio "<config qwen_clone_audio>" --clone-transcript "<config qwen_clone_transcript>"` (then `--speaker` and `--instruct` are not needed): the lines are voiced in the speaker of that recording, one sentence at a time with a short pause between them. Add `--tempo <config qwen_tempo>` when it is not `1.0`: it slows (below 1) or speeds the voice after generation, without changing pitch.
 
@@ -147,7 +163,7 @@ Append `--say <written>=<spoken>` for each entry of config `pronunciations`. Add
 
 Before it replaces a file it copies it into `voice-takes/<timestamp>/`. `--restore <timestamp> --frames <N...>` puts a take back (without `--frames`, every file in it); the file it replaces is saved too. Never delete `voice-takes/`.
 
-When it fails because the Mac is not Apple Silicon or MLX-Audio cannot load, stop, say so, and offer the user's own engine instead (switch per the voice check below).
+When it fails because the Mac is not Apple Silicon or MLX-Audio cannot load, stop, say so, and offer the user's own engine instead (switch per the voice check below). A build that is slow or stalled is the environment check's case above, not this one.
 
 ### The user's own engine
 

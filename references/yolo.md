@@ -27,7 +27,7 @@ The coding agent's own permission prompts (for `npx`, `ffmpeg`, `uv`, `curl`, `g
 | Gate 3: the look | Show three rendered samples, wait for a pick | Write the three looks from `references/motion-styles.md`, then render only the recommended one's sample (the style whose `fits` best matches the digest): `look_samples.py . --look <its folder>`. If the sample still fails after the three fixes `SKILL.md` allows, try the next look the same way. When none renders, stop. Take the look whose sample rendered, and record `gate 3 (look): auto (yolo) <time> <look name> sha256 <hash>`. A failed font fetch means a bundled family, listed in the report. |
 | Frame plan review | Reviewed | `STORYBOARD.md` has `mode: autonomous`: no plan review; the scenes are built straight from the script. |
 | Speech check: a line still differs after two retakes | Ask keep, reword or add a pronunciation | Keep it and list it in the report. |
-| Voice check failure | Offer to switch voice source | Stop and list the frames. |
+| Voice check failure | Offer to switch voice source | Stop and list the frames; a voice environment that does not build (`references/handoff.md` § Qwen3-TTS) stops the same way, reported in the final report. |
 | Review stills and the render-or-changes question | Ask | Do not ask and do not open the preview: run the claim check, `finish.py . --review` (it must pass), then `finish.py . --final` once, and continue. |
 | Sync difference above 2 seconds | Report before `done` | Report it in the final report. |
 | Video QC failure | Report before `done` | Report it in the final report. |
