@@ -82,6 +82,16 @@ class QwenVoiceTests(Base):
         self.assertEqual((self.fake.clone, self.fake.tempo), (None, 1.0))
         self.assertEqual(self.fake.voices_needed, {"Aiden"})
 
+    def test_voicing_prints_a_progress_bar(self):
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            qwen_voice.main([str(self.p)], make_synthesizer=self.fake.make)
+        lines = out.getvalue().splitlines()
+        voiced = [i for i, line in enumerate(lines) if line.startswith("voiced frame")]
+        self.assertEqual(len(voiced), 3)
+        self.assertLess(lines.index("loading the voice model"), voiced[0])
+        self.assertTrue(lines[voiced[-1]].endswith("█" * 20 + " 3/3"))
+
     def test_frames_option_voices_only_those(self):
         (self.p / "voice-in").mkdir()
         (self.p / "voice-in/00.wav").write_bytes(b"keep")

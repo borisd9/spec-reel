@@ -31,7 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from adopt_voice import (  # noqa: E402
-    BUILTIN_RESPELLINGS, UNKNOWN_SPEAKER, VOICE_STEM, EXTS, audio_files, parse_script, respell, scan_turns, sync_script, words_of,
+    BUILTIN_RESPELLINGS, UNKNOWN_SPEAKER, VOICE_STEM, EXTS, audio_files, parse_script, progress_bar, respell, scan_turns, sync_script, words_of,
 )
 
 DEFAULT_MODEL = "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16"
@@ -240,18 +240,21 @@ def main(argv, make_synthesizer=qwen_synthesizer):
         return 1
 
     needed = {voice for items in work.values() for _, _, voice in items}
+    print("loading the voice model", flush=True)
     synthesize = make_synthesizer(a.model or DEFAULT_MODEL, a.language, a.instruct, clone, a.tempo, needed)  # loads every model
     voice_in = a.project_dir / "voice-in"
     voice_in.mkdir(exist_ok=True)
     take = back_up(voice_in, wanted, time.strftime("%Y%m%d-%H%M%S"))
     if take.is_dir():
         print(f"the files replaced are in {take.relative_to(a.project_dir)}", flush=True)
+    total, done = sum(len(work[f]) for f in wanted), 0
     for frame in wanted:
         for old in audio_files(voice_in, frame):  # plain and turn files never coexist, or adopt_voice.py refuses the frame
             old.unlink()
         for text, stem, voice in work[frame]:
             synthesize(respell(text, pairs), voice_in / f"{stem}.wav", voice)
-            print(f"voiced frame {frame} -> voice-in/{stem}.wav ({voice})", flush=True)
+            done += 1
+            print(f"voiced frame {frame} -> voice-in/{stem}.wav ({voice})  {progress_bar(done, total)}", flush=True)
     return 0
 
 

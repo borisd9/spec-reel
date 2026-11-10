@@ -195,6 +195,14 @@ def scene_cards(storyboard_md):
     return cards
 
 
+def progress_bar(done, total, width=20, percent=False):
+    """'███████░░░░░░░░░░░░░ 7/20' style bar, or '... 35%' with percent."""
+    if total <= 0:
+        return "░" * width + " 0/0"
+    filled = min(width, max(0, round(width * done / total)))
+    return "█" * filled + "░" * (width - filled) + (f" {done}%" if percent else f" {done}/{total}")
+
+
 def words_of(text):
     return re.sub(r"[^\w\s]", " ", text.lower().replace("'", "")).split()
 
