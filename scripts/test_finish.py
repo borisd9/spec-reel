@@ -40,6 +40,44 @@ class Fake:
         return [c.split(" -I ")[1].split(" ")[0].rsplit("/", 1)[-1] if " -I " in c else c.split(" ")[2] for c in self.cmds]
 
 
+RENDER_SCRIPT = "\n".join(["hello", '@hf-progress {"pct": 1}', '@hf-progress {"pct": 3}', '@hf-progress {"pct": 26}',
+                           "  ████░░░░  25%  Starting frame capture", '@hf-progress {"pct": 100}',
+                           "@hf-progress not json", "bye"])
+
+
+class RunCommandTests(unittest.TestCase):
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+
+    def test_run_command_prints_a_render_bar_every_five_percent(self):
+        out = io.StringIO()
+        script = f"print({RENDER_SCRIPT!r})"
+        with contextlib.redirect_stdout(out):
+            code, output = finish.run_command([sys.executable, "-c", script], self._td.name, capture=True)
+        shown = out.getvalue()
+        self.assertEqual(code, 0)
+        self.assertEqual([line for line in shown.splitlines() if line.startswith("render  ")],
+                         [f"render  {finish.progress_bar(n, 100, percent=True)}" for n in (1, 26, 100)])
+        self.assertIn("hello", shown)
+        self.assertIn("bye", shown)
+        self.assertNotIn("@hf-progress", shown)
+        self.assertNotIn("Starting frame capture", shown)
+        for line in RENDER_SCRIPT.splitlines():
+            self.assertIn(line, output)
+
+    def test_run_command_returns_the_exit_code_without_capture(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(finish.run_command([sys.executable, "-c", "import sys; sys.exit(3)"], self._td.name), 3)
+
+    def test_run_command_survives_a_non_utf8_byte(self):
+        cmd = [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'bad \\xff byte\\n')"]
+        with contextlib.redirect_stdout(io.StringIO()):
+            code, output = finish.run_command(cmd, self._td.name, capture=True)
+        self.assertEqual(code, 0)
+        self.assertIn("bad \ufffd byte", output)
+
+
 class FinishTests(unittest.TestCase):
     def setUp(self):
         self._td = tempfile.TemporaryDirectory()
@@ -150,6 +188,32 @@ class FinishTests(unittest.TestCase):
         self.assertIn("compositions/feed.html:2", err)
         self.assertIn("compositions/feed.html:3", err)
         self.assertNotIn("feed.html:1", err)
+
+    def test_lint_fails_screenshot_only_effects(self):
+        (self.p / "compositions/feed.html").write_text(
+            ".a { mix-blend-mode: normal; z-index: 2; mask-image: radial-gradient(#000, transparent); "
+            "-webkit-mask-image: none; }\n"
+            'tl.fromTo(".b", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0 0 0)" }, 0);\n'
+            ".c { mix-blend-mode: multiply; }\n"
+            'tl.to(".d", { rotationX: 30 }, 0);\n'
+            'tl.to(".e", { maskImage: "none" }, 0);\n'
+            "const shots = [{x: 960, y: 540, z: 1.4}]; .g { mask: radial-gradient(#000, transparent); }\n"
+            'tl.to(".h", { backdropFilter: "blur(8px)" }, 0);\n'
+            'tl.to(".i", { z: 100 }, 0); tl.fromTo(".j", { mask: "none" }, { mask: "x" }, 0);')
+        code, _, err, _ = self.run_finish("--review")
+        self.assertEqual(code, 1)
+        self.assertIn("blend modes, backdrop filters, drop shadows and tweens of mask or 3D properties force "
+                      "screenshot capture", err)
+        for n in (3, 4, 5, 7, 8):
+            self.assertIn(f"feed.html:{n}", err)
+        self.assertNotIn("feed.html:1", err)
+        self.assertNotIn("feed.html:2", err)
+        self.assertNotIn("feed.html:6", err)
+
+    def test_render_env_reaches_the_render(self):
+        check = ("import os, sys; sys.exit(0 if os.environ.get('HF_DE_PARALLEL_ROUTER') == 'true'"
+                 " and os.environ.get('HF_FAST_CAPTURE_INTERVAL_SS') == 'false' else 1)")
+        self.assertEqual(finish.run_command([sys.executable, "-c", check], self.p), 0)
 
     def test_blur_lint_catches_css_filters_in_index_html(self):
         (self.p / "index.html").write_text("<style>.x { backdrop-filter: blur(var(--r)); }</style>")

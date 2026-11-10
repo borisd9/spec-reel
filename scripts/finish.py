@@ -26,7 +26,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from adopt_voice import fill_facts, load_facts  # noqa: E402
+from adopt_voice import fill_facts, load_facts, progress_bar  # noqa: E402
 from build_index import layout, scene_ids  # noqa: E402
 
 # A CSS blur drops the renderer from fast capture to screenshot capture (about 2x slower). `f.blur(tl, ...)` is
@@ -39,15 +39,50 @@ CALLBACK = re.compile(r"\bonUpdate\s*:")
 RANDOM = re.compile(r"^(?!\s*//).*\bMath\.random\s*\(")
 # A WebGL context always makes the renderer fall back to screenshot capture, about 2x slower.
 WEBGL = re.compile(r"""getContext\(\s*["'](?:webgl2?|experimental-webgl)["']|\bthree(?:\.module)?(?:\.min)?\.js\b""")
+# The parallel router and keeping clipPath wipes on fast capture: timings in references/handoff.md (the Speed note).
+# HF_FAST_CAPTURE_INTERVAL_SS=false turns off HyperFrames' whole timeline at-risk check, not only for clipPath, the one
+# property measured safe; SCREENSHOT fails the others.
+RENDER_ENV = {"HF_DE_PARALLEL_ROUTER": "true", "HF_FAST_CAPTURE_INTERVAL_SS": "false"}
+# Fails the other properties that check would have caught, plus the CSS effects that send the whole render to screenshot capture.
+SCREENSHOT = re.compile(r"mix-blend-mode\s*:(?!\s*normal)|\bmixBlendMode\s*:|backdrop-filter\s*:(?!\s*none)|\bbackdropFilter\s*:"
+                        r"|\bdrop-shadow\("
+                        r"|(?<![\w-])(?:maskImage|rotationX|rotationY|rotateX|rotateY|translateZ)\s*:"
+                        # bare z and mask only inside a tween call: camera data and the CSS mask shorthand are not slow
+                        r"|\.(?:to|from|fromTo|set)\(.*(?<![\w-])(?:z|mask)\s*:")
+LINT_RULES = (
+    (BLUR, "filter blur() turns fast capture off; use opacity and y instead"),
+    (CALLBACK, "onUpdate callbacks are not seek-safe and make fast capture fall back; build the effect from tweens of "
+               "elements (see fx.type)"),
+    (RANDOM, "Math.random is not seek-safe; use fx.rand(seed)"),
+    (WEBGL, "WebGL forces screenshot capture (about 2x slower); draw with Canvas 2D or SVG"),
+    (SCREENSHOT, "blend modes, backdrop filters, drop shadows and tweens of mask or 3D properties force screenshot "
+                 "capture (slower); use opacity, clipPath or 2D transforms"),
+)
 STATE_HEAD = "## Finish state"
 SYNC_LIMIT_S = 2.0
 
 
-def run_command(cmd, cwd):
-    # Measured on a 3-minute, 17-scene video: the parallel drawElement router renders it in 45 s against 1 m 55 s for
-    # one worker, with the same frames (PSNR 72 dB) and the same self-checks.
-    env = {"HF_DE_PARALLEL_ROUTER": "true", **os.environ}
-    return subprocess.run(cmd, cwd=cwd, env=env).returncode
+def run_command(cmd, cwd, capture=False):
+    """Run a render. Prints a bar line each 5% and the other output; returns the exit code, or (code, output) if capture."""
+    # Text mode reads HyperFrames' redrawn "\r" bar as lines, and its per-frame @hf-progress JSON is thinned to 5% steps.
+    kept, step = [], -1
+    with subprocess.Popen(cmd, cwd=cwd, env={**RENDER_ENV, **os.environ}, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1) as proc:
+        for line in proc.stdout:
+            if capture:
+                kept.append(line)
+            if line.startswith("@hf-progress "):
+                try:
+                    pct = int(json.loads(line[len("@hf-progress "):])["pct"])
+                except (ValueError, KeyError, TypeError):
+                    continue
+                if pct // 5 > step:
+                    step = pct // 5
+                    print(f"render  {progress_bar(pct, 100, percent=True)}", flush=True)
+            elif "█" not in line and "░" not in line:
+                print(line, end="", flush=True)
+    code = proc.returncode
+    return (code, "".join(kept)) if capture else code
 
 
 def probe_length(video):
@@ -105,15 +140,8 @@ def fast_capture_problems(files, root):
     """The fast-capture lint messages for `files` (paths shown relative to `root`); missing files are skipped."""
     lines = [(f"{f.relative_to(root)}:{n}", line) for f in files if f.exists()
              for n, line in enumerate(f.read_text().splitlines(), 1)]
-    blur = [where for where, line in lines if BLUR.search(line)]
-    callbacks = [where for where, line in lines if CALLBACK.search(line)]
-    unseeded = [where for where, line in lines if RANDOM.search(line)]
-    webgl = [where for where, line in lines if WEBGL.search(line)]
-    return (["filter blur() turns fast capture off; use opacity and y instead: " + ", ".join(blur)] if blur else []) \
-        + (["onUpdate callbacks are not seek-safe and make fast capture fall back; build the effect from tweens of "
-            "elements (see fx.type): " + ", ".join(callbacks)] if callbacks else []) \
-        + (["Math.random is not seek-safe; use fx.rand(seed): " + ", ".join(unseeded)] if unseeded else []) \
-        + (["WebGL forces screenshot capture (about 2x slower); draw with Canvas 2D or SVG: " + ", ".join(webgl)] if webgl else [])
+    return [f"{message}: " + ", ".join(hits) for pattern, message in LINT_RULES
+            if (hits := [where for where, line in lines if pattern.search(line)])]
 
 
 class Finish:
