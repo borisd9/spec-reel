@@ -44,6 +44,9 @@ WEBGL = re.compile(r"""getContext\(\s*["'](?:webgl2?|experimental-webgl)["']|\bt
 # capture; without it HyperFrames screenshots their frames and holds the render to one worker (200 s against 63 s,
 # lowest frame 53.5 dB). The other properties that gate catches are failed by SCREENSHOT below.
 RENDER_ENV = {"HF_DE_PARALLEL_ROUTER": "true", "HF_FAST_CAPTURE_INTERVAL_SS": "false"}
+# These send frames, or the whole render, to screenshot capture, which RENDER_ENV does not cover.
+SCREENSHOT = re.compile(r"mix-blend-mode\s*:(?!\s*normal)|\bmixBlendMode\s*:|backdrop-filter\s*:(?!\s*none)|\bdrop-shadow\("
+                        r"|(?<![\w-])(?:mask|maskImage|rotationX|rotationY|rotateX|rotateY|translateZ|z)\s*:")
 STATE_HEAD = "## Finish state"
 SYNC_LIMIT_S = 2.0
 
@@ -112,11 +115,14 @@ def fast_capture_problems(files, root):
     callbacks = [where for where, line in lines if CALLBACK.search(line)]
     unseeded = [where for where, line in lines if RANDOM.search(line)]
     webgl = [where for where, line in lines if WEBGL.search(line)]
+    screenshot = [where for where, line in lines if SCREENSHOT.search(line)]
     return (["filter blur() turns fast capture off; use opacity and y instead: " + ", ".join(blur)] if blur else []) \
         + (["onUpdate callbacks are not seek-safe and make fast capture fall back; build the effect from tweens of "
             "elements (see fx.type): " + ", ".join(callbacks)] if callbacks else []) \
         + (["Math.random is not seek-safe; use fx.rand(seed): " + ", ".join(unseeded)] if unseeded else []) \
-        + (["WebGL forces screenshot capture (about 2x slower); draw with Canvas 2D or SVG: " + ", ".join(webgl)] if webgl else [])
+        + (["WebGL forces screenshot capture (about 2x slower); draw with Canvas 2D or SVG: " + ", ".join(webgl)] if webgl else []) \
+        + (["blend modes, backdrop filters, drop shadows and tweens of mask or 3D properties force screenshot capture "
+            "(slower); use opacity, clipPath or 2D transforms: " + ", ".join(screenshot)] if screenshot else [])
 
 
 class Finish:

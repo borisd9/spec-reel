@@ -151,6 +151,23 @@ class FinishTests(unittest.TestCase):
         self.assertIn("compositions/feed.html:3", err)
         self.assertNotIn("feed.html:1", err)
 
+    def test_lint_fails_screenshot_only_effects(self):
+        (self.p / "compositions/feed.html").write_text(
+            ".a { mix-blend-mode: normal; z-index: 2; mask-image: radial-gradient(#000, transparent); "
+            "-webkit-mask-image: none; }\n"
+            'tl.fromTo(".b", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0 0 0)" }, 0);\n'
+            ".c { mix-blend-mode: multiply; }\n"
+            'tl.to(".d", { rotationX: 30 }, 0);\n'
+            'tl.to(".e", { mask: "none" }, 0);')
+        code, _, err, _ = self.run_finish("--review")
+        self.assertEqual(code, 1)
+        self.assertIn("blend modes, backdrop filters, drop shadows and tweens of mask or 3D properties force "
+                      "screenshot capture", err)
+        for n in (3, 4, 5):
+            self.assertIn(f"feed.html:{n}", err)
+        self.assertNotIn("feed.html:1", err)
+        self.assertNotIn("feed.html:2", err)
+
     def test_render_env_keeps_wipes_on_fast_capture(self):
         self.assertEqual(finish.RENDER_ENV, {"HF_DE_PARALLEL_ROUTER": "true", "HF_FAST_CAPTURE_INTERVAL_SS": "false"})
 
