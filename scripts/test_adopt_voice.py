@@ -476,6 +476,16 @@ class TurnTests(Base):
         self.assertEqual(calls, ["02.wav"])
 
 
+class ProgressBarTests(unittest.TestCase):
+    def test_progress_bar(self):
+        self.assertEqual(av.progress_bar(0, 4), "░" * 20 + " 0/4")
+        self.assertEqual(av.progress_bar(2, 4), "█" * 10 + "░" * 10 + " 2/4")
+        self.assertEqual(av.progress_bar(4, 4), "█" * 20 + " 4/4")
+        self.assertEqual(av.progress_bar(45, 100, percent=True), "█" * 9 + "░" * 11 + " 45%")
+        self.assertEqual(av.progress_bar(45, 100), "█" * 9 + "░" * 11 + " 45/100")
+        self.assertEqual(av.progress_bar(0, 0), "░" * 20 + " 0/0")
+
+
 class ToWavCommandTests(unittest.TestCase):
     """The ffmpeg command line, with subprocess.run replaced."""
 

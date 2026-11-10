@@ -40,6 +40,44 @@ class Fake:
         return [c.split(" -I ")[1].split(" ")[0].rsplit("/", 1)[-1] if " -I " in c else c.split(" ")[2] for c in self.cmds]
 
 
+RENDER_SCRIPT = "\n".join(["hello", '@hf-progress {"pct": 1}', '@hf-progress {"pct": 3}', '@hf-progress {"pct": 26}',
+                           "  ████░░░░  25%  Starting frame capture", '@hf-progress {"pct": 100}',
+                           "@hf-progress not json", "bye"])
+
+
+class RunCommandTests(unittest.TestCase):
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+
+    def test_run_command_prints_a_render_bar_every_five_percent(self):
+        out = io.StringIO()
+        script = f"print({RENDER_SCRIPT!r})"
+        with contextlib.redirect_stdout(out):
+            code, output = finish.run_command([sys.executable, "-c", script], self._td.name, capture=True)
+        shown = out.getvalue()
+        self.assertEqual(code, 0)
+        self.assertEqual([line for line in shown.splitlines() if line.startswith("render  ")],
+                         [f"render  {finish.progress_bar(n, 100, percent=True)}" for n in (1, 26, 100)])
+        self.assertIn("hello", shown)
+        self.assertIn("bye", shown)
+        self.assertNotIn("@hf-progress", shown)
+        self.assertNotIn("Starting frame capture", shown)
+        for line in RENDER_SCRIPT.splitlines():
+            self.assertIn(line, output)
+
+    def test_run_command_returns_the_exit_code_without_capture(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(finish.run_command([sys.executable, "-c", "import sys; sys.exit(3)"], self._td.name), 3)
+
+    def test_run_command_survives_a_non_utf8_byte(self):
+        cmd = [sys.executable, "-c", "import sys; sys.stdout.buffer.write(b'bad \\xff byte\\n')"]
+        with contextlib.redirect_stdout(io.StringIO()):
+            code, output = finish.run_command(cmd, self._td.name, capture=True)
+        self.assertEqual(code, 0)
+        self.assertIn("bad \ufffd byte", output)
+
+
 class FinishTests(unittest.TestCase):
     def setUp(self):
         self._td = tempfile.TemporaryDirectory()

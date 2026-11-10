@@ -11,18 +11,17 @@ lacks fails before any render. Writes nothing outside looks/. `--look` limits th
 
 Standard library only. The render goes through `render` (`runner`, an exit-code-only stand-in, replaces it in tests).
 """
+import functools
 import json
 import re
-import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import build_index  # noqa: E402
-from finish import RENDER_ENV, fast_capture_problems  # noqa: E402
+from finish import fast_capture_problems, run_command  # noqa: E402
 
 LOOK_NAME = re.compile(r"^\d+-[\w-]+$")
 PROJECT_FILES = ("hyperframes.json", "meta.json", "package.json")
@@ -72,16 +71,8 @@ def build_sample(p, look):
     return sample
 
 
-def render_command(cmd, cwd):
-    """Run the render like finish.run_command but keep its output: returns (exit code, stdout and stderr together)."""
-    env = {**RENDER_ENV, **os.environ}
-    r = subprocess.run(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    print(r.stdout, end="")
-    return r.returncode, r.stdout
-
-
 def main(argv, runner=None, render=None):
-    render = render or (render_command if runner is None else (lambda cmd, cwd: (runner(cmd, cwd), "")))
+    render = render or (functools.partial(run_command, capture=True) if runner is None else (lambda cmd, cwd: (runner(cmd, cwd), "")))
     args = list(argv)
     only = None
     if "--look" in args:
@@ -112,8 +103,9 @@ def main(argv, runner=None, render=None):
             except ValueError as e:
                 problems.append(f"{look.name}: {e}")
     if not problems:
-        for look, sample in samples:
+        for i, (look, sample) in enumerate(samples, 1):
             out = look / "intro.mp4"
+            print(f"rendering {look.name} ({i}/{len(samples)})", flush=True)
             code, log = render(["npx", "hyperframes", "render", ".", "-o", str(out)], sample)
             if code != 0:
                 problems.append(f"{look.name}: render failed")
