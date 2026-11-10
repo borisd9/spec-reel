@@ -58,7 +58,7 @@ class RunCommandTests(unittest.TestCase):
         shown = out.getvalue()
         self.assertEqual(code, 0)
         self.assertEqual([line for line in shown.splitlines() if line.startswith("render  ")],
-                         [f"render  {finish.progress_bar(n, 100)}" for n in (1, 26, 100)])
+                         [f"render  {finish.progress_bar(n, 100, percent=True)}" for n in (1, 26, 100)])
         self.assertIn("hello", shown)
         self.assertIn("bye", shown)
         self.assertNotIn("@hf-progress", shown)

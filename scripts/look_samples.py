@@ -11,6 +11,7 @@ lacks fails before any render. Writes nothing outside looks/. `--look` limits th
 
 Standard library only. The render goes through `render` (`runner`, an exit-code-only stand-in, replaces it in tests).
 """
+import functools
 import json
 import re
 import shutil
@@ -20,8 +21,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import build_index  # noqa: E402
-import finish  # noqa: E402
-from finish import fast_capture_problems  # noqa: E402
+from finish import fast_capture_problems, run_command  # noqa: E402
 
 LOOK_NAME = re.compile(r"^\d+-[\w-]+$")
 PROJECT_FILES = ("hyperframes.json", "meta.json", "package.json")
@@ -72,7 +72,7 @@ def build_sample(p, look):
 
 
 def main(argv, runner=None, render=None):
-    render = render or ((lambda cmd, cwd: finish.run_command(cmd, cwd, capture=True)) if runner is None else (lambda cmd, cwd: (runner(cmd, cwd), "")))
+    render = render or (functools.partial(run_command, capture=True) if runner is None else (lambda cmd, cwd: (runner(cmd, cwd), "")))
     args = list(argv)
     only = None
     if "--look" in args:

@@ -481,7 +481,8 @@ class ProgressBarTests(unittest.TestCase):
         self.assertEqual(av.progress_bar(0, 4), "░" * 20 + " 0/4")
         self.assertEqual(av.progress_bar(2, 4), "█" * 10 + "░" * 10 + " 2/4")
         self.assertEqual(av.progress_bar(4, 4), "█" * 20 + " 4/4")
-        self.assertEqual(av.progress_bar(45, 100), "█" * 9 + "░" * 11 + " 45%")
+        self.assertEqual(av.progress_bar(45, 100, percent=True), "█" * 9 + "░" * 11 + " 45%")
+        self.assertEqual(av.progress_bar(45, 100), "█" * 9 + "░" * 11 + " 45/100")
         self.assertEqual(av.progress_bar(0, 0), "░" * 20 + " 0/0")
 
 

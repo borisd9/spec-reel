@@ -76,7 +76,7 @@ def run_command(cmd, cwd, capture=False):
                     continue
                 if pct // 5 > step:
                     step = pct // 5
-                    print(f"render  {progress_bar(pct, 100)}", flush=True)
+                    print(f"render  {progress_bar(pct, 100, percent=True)}", flush=True)
             elif "█" not in line and "░" not in line:
                 print(line, end="", flush=True)
     code = proc.returncode
