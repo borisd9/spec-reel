@@ -696,6 +696,12 @@ class CheckScriptTests(Base):
         self.assertEqual(code, 1)
         self.assertIn("frame 2: 31 spoken words; a scene has at most 30", err)
 
+    def test_a_spaced_dash_is_not_a_word(self):
+        text = " ".join(["word"] * 15) + " — " + " ".join(["word"] * 15) + "."
+        code, err = self.check(INTRO_SCRIPT.replace("Shipped the thing.", text))
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("spoken words", err)
+
     def test_line_of_exactly_30_words_passes(self):
         script = INTRO_SCRIPT.replace("Shipped the thing.", " ".join(["word"] * 30) + ".")
         self.assertEqual(self.check(script)[0], 0)

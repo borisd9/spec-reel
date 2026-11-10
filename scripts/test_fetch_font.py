@@ -55,6 +55,34 @@ class FetchFontTests(unittest.TestCase):
             '@font-face { font-family: "Press Start 2P"; src: url("assets/fonts/press-start-2p-%s.woff2") '
             'format("woff2"); font-weight: %s; }' % (w, w) for w in ("400", "700")])
 
+    def test_weights_are_sorted_and_deduplicated(self):
+        code, out, _ = self.run_main("Press Start 2P", "700", "400", "700")
+        self.assertEqual(code, 0)
+        self.assertIn("wght@400;700", self.calls[0][0])
+        rules = [line for line in out.splitlines() if "@font-face" in line]
+        self.assertEqual(len(rules), 2)
+        self.assertIn("font-weight: 400", rules[0])
+        self.assertIn("font-weight: 700", rules[1])
+
+    def test_non_numeric_weight_prints_usage(self):
+        code, _, err = self.run_main("Press Start 2P", "bold")
+        self.assertEqual(code, 1)
+        self.assertIn("usage:", err)
+        self.assertEqual(self.calls, [])
+
+    def test_server_error_suggests_a_bundled_family(self):
+        self.error = urllib.error.HTTPError("u", 503, "Service Unavailable", {}, None)
+        code, _, err = self.run_main("Press Start 2P", "400")
+        self.assertEqual(code, 1)
+        self.assertIn("bundled family", err)
+
+    def test_timeout_suggests_a_bundled_family(self):
+        self.error = TimeoutError("timed out")
+        code, _, err = self.run_main("Press Start 2P", "400")
+        self.assertEqual(code, 1)
+        self.assertIn("timed out", err)
+        self.assertIn("bundled family", err)
+
     def test_css_request_uses_the_browser_user_agent(self):
         self.run_main("Press Start 2P", "400")
         url, headers = self.calls[0]

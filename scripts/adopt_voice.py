@@ -194,6 +194,12 @@ def unrespell(text, pairs=BUILTIN_RESPELLINGS):
     return text
 
 
+def spoken_word_count(text):
+    """Written words, not spoken ones: "P R" counts as the one word "PR", a hyphenated word as one, and bare
+    punctuation (a spaced dash) as none."""
+    return sum(1 for tok in unrespell(text).split() if re.search(r"[^\W_]", tok))
+
+
 # --- one owner per fact and per script ------------------------------------------------------
 
 def load_facts(p):
@@ -511,11 +517,10 @@ def check_script(p):
     problems = []
     if not INTRO_HEADING.search(approved_md) or not approved or approved[0][0] != 1:
         problems.append("user_script.txt must open with '## Line 1 — Intro (Frame 1)'")
-    elif not 0 < len(unrespell(approved[0][1]).split()) <= MAX_INTRO_WORDS:
-        # the written words: "P R" counts as the one word "PR", a hyphenated word as one
+    elif not 0 < spoken_word_count(approved[0][1]) <= MAX_INTRO_WORDS:
         problems.append(f"frame 1: the intro is one short sentence of at most {MAX_INTRO_WORDS} words")
     for frame, text in approved:
-        n = len(unrespell(text).split())
+        n = spoken_word_count(text)
         if n > MAX_LINE_WORDS:
             problems.append(f"frame {frame}: {n} spoken words; a scene has at most {MAX_LINE_WORDS}")
     problems += turn_problems(approved_md)
