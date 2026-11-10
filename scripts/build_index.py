@@ -106,7 +106,7 @@ def build(p):
     def js(obj):  # a JSON literal inside <script>: "</" must not end it
         return json.dumps(obj, separators=(",", ":")).replace("</", "<\\/")
 
-    # A run restyled for another preset keeps its own copy of the template.
+    # The run's picked look is its own copy of the template (gate 3).
     template = p / "build/index.template.html"
     out = (template if template.exists() else SKILL / "assets/index.template.html").read_text()
     for key, value in (("%TOTAL%", f"{total:.3f}"), ("%HOSTS%", "\n".join(hosts)), ("%AUDIO%", "\n".join(audio)),
