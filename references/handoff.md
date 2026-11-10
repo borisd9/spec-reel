@@ -140,7 +140,7 @@ Runs on this Mac (Apple Silicon) with Qwen3-TTS through MLX-Audio. The script te
    "<qwen venv>/bin/python" -c "import importlib.metadata as m, mlx_audio, mlx_audio.tts.utils, soundfile; assert m.version('mlx-audio') == '0.6.1'"
    ```
 
-   Exit 0: voice (step 2). Any failure: the env is not built yet, this skill version pins another `mlx-audio` version, or a build stopped partway (it can install `mlx_audio` without its dependencies, so the check imports what `qwen_voice.py` imports and the venv is rebuilt rather than mistaken for an MLX-Audio failure). Build it once, visibly, with long timeouts and retries, in the background, with its output in `voice-env.log` in the project folder; the subshell puts the timeouts and the log over `uv venv` too, which may download Python 3.11 (`--clear` recreates an existing venv, which is right for a rebuild; without it `uv venv` refuses an existing path):
+   Exit 0: voice (step 2). Any failure means the venv is missing, pins another `mlx-audio`, or was left half-built (the check imports what `qwen_voice.py` imports, so that case rebuilds too). Build it in the background, with `voice-env.log` in the project folder. The subshell gives `uv venv` (which may download Python 3.11) the same timeouts and log, and `--clear` replaces an existing venv:
 
    ```bash
    ( export UV_HTTP_TIMEOUT=1800 UV_HTTP_RETRIES=5
@@ -148,7 +148,7 @@ Runs on this Mac (Apple Silicon) with Qwen3-TTS through MLX-Audio. The script te
      uv pip install -v --python "<qwen venv>/bin/python" mlx-audio==0.6.1 soundfile ) > voice-env.log 2>&1
    ```
 
-   `-v` is there so the log gains a line per request: "the log has not grown for 10 minutes" then means a stall, and its last lines name the request it is stuck on. Look at `voice-env.log` every minute or two. When it exits 0, run the check again, then voice. When it fails, or the log has not grown for 10 minutes, stop and tell the user: "The voice environment did not build: the package index is slow or unreachable (see voice-env.log)." Then offer: wait and retry the same command, or the user's own engine (switch per the voice check below). Do not change the package index.
+   With `-v` the log gains a line per request, so a log that has not grown for 10 minutes is a stall, and its last lines name the request. Look at it every minute or two. On exit 0, run the check again, then voice. When it fails or stalls, stop and tell the user: "The voice environment did not build: the package index is slow or unreachable (see voice-env.log)." Then offer: wait and retry the same command, or the user's own engine (switch per the voice check below). Do not change the package index.
 2. **Voice.** The model download below goes to Hugging Face, not through uv.
 
    ```bash
