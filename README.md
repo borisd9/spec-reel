@@ -89,10 +89,11 @@ cp config.example.json config.json
 **Qwen3-TTS** (default). Runs locally through MLX-Audio, so the script text never leaves your machine. Model: `mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16` (Apache-2.0). On an Apple Silicon Mac it generates speech faster than real time: about a minute for 90 seconds of narration, after the first model load. It runs from one environment at `<qwen venv>` = `${XDG_CACHE_HOME:-$HOME/.cache}/spec-reel/qwen-venv`, built once and then run directly, so a slow package index only matters the first time. To voice a script by hand, check the environment (no network), build it if the check fails, then run:
 
 ```bash
-"<qwen venv>/bin/python" -c "import importlib.metadata as m, mlx_audio; assert m.version('mlx-audio') == '0.6.1'"
+"<qwen venv>/bin/python" -c "import importlib.metadata as m, mlx_audio, mlx_audio.tts.utils, soundfile; assert m.version('mlx-audio') == '0.6.1'"
 
-uv venv --clear --python 3.11 "<qwen venv>" && \
-UV_HTTP_TIMEOUT=1800 UV_HTTP_RETRIES=5 uv pip install -v --python "<qwen venv>/bin/python" mlx-audio==0.6.1 soundfile
+( export UV_HTTP_TIMEOUT=1800 UV_HTTP_RETRIES=5
+  uv venv --clear --python 3.11 "<qwen venv>" && \
+  uv pip install -v --python "<qwen venv>/bin/python" mlx-audio==0.6.1 soundfile )
 
 "<qwen venv>/bin/python" scripts/qwen_voice.py <run folder> --speaker Aiden
 ```

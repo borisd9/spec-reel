@@ -192,8 +192,9 @@ class SkillStructureTests(unittest.TestCase):
 
     def test_voice_env_check_is_documented(self):
         handoff = (ROOT / "references/handoff.md").read_text()
-        self.assertIn("\"<qwen venv>/bin/python\" -c \"import importlib.metadata as m, mlx_audio; assert m.version('mlx-audio') == '0.6.1'\"", handoff)
-        self.assertIn("UV_HTTP_TIMEOUT=1800 UV_HTTP_RETRIES=5 uv pip install -v --python", handoff)
+        self.assertIn("\"<qwen venv>/bin/python\" -c \"import importlib.metadata as m, mlx_audio, mlx_audio.tts.utils, soundfile; assert m.version('mlx-audio') == '0.6.1'\"", handoff)
+        self.assertIn("export UV_HTTP_TIMEOUT=1800 UV_HTTP_RETRIES=5", handoff)
+        self.assertIn("uv pip install -v --python", handoff)
         self.assertIn("qwen-venv", handoff)
         voicing = [line.strip() for line in handoff.splitlines() if "scripts/qwen_voice.py" in line and not line.strip().endswith(".")]
         self.assertTrue(voicing)
