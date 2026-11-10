@@ -135,6 +135,8 @@ class SkillStructureTests(unittest.TestCase):
             if sid in HF_SEEK:
                 self.assertEqual(runtime, "hf-seek", sid)
             self.assertNotRegex(body, r"(?i)three\.js|webgl", sid)
+            # A blend sends the whole render to screenshot capture; finish.py's lint reads runs, not this catalog.
+            self.assertNotRegex(body, r"mix-blend-mode|mixBlendMode", sid)
             if sid in BANG:
                 self.assertIn("bangtutorial/bang-motion", re.search(r"^- source: (.+)$", body, re.M).group(1), sid)
                 for key in ("rules", "prompt"):  # the motion bullet may name a filter it replaces
